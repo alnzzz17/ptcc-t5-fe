@@ -1,0 +1,47 @@
+.note-card {
+    min-height: 200px;
+    /* Tinggi minimum card */
+    display: flex;
+    flex-direction: column;
+}
+
+.card-body {
+    flex-grow: 1;
+    /* Memastikan card-body mengisi sisa ruang */
+    display: flex;
+    flex-direction: column;
+}
+
+.note-content {
+    flex-grow: 1;
+    /* agar konten ngisi sisa ruang di card-body */
+    overflow: hidden;
+    /* agar konten yang panjang ngga meluber */
+    text-overflow: ellipsis;
+    /* nambahin ellip kalau konten kepanjangan */
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    /* Batasi jumlah baris konten */
+    -webkit-box-orient: vertical;
+}
+
+.button-container {
+    margin-top: auto;
+    /* agar tombol selalu di bagian bawah */
+    padding-top: 10px;
+    /* jarak konten dan tombol */
+    display: flex;
+    justify-content: center;
+    /* memposisikan tombol di tengah */
+    gap: 10px;
+    /* jarak antar tombol */
+}
+
+.card-header {
+    white-space: nowrap;
+    /* Judul tidak boleh lebih dari 1 baris */
+    overflow: hidden;
+    /* Agar judul tidak meluber */
+    text-overflow: ellipsis;
+    /* Menambahkan ellipsis jika judul terlalu panjang */
+}
