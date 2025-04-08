@@ -34,8 +34,8 @@
                     </div>
 
                     <div class="mt-3">
-                        <p>Don't have an account? <a href="./register.html"
-                                class="text-decoration-none">Register</a></p>
+                        <p>Don't have an account? <a href="./register.html" class="text-decoration-none">Register</a>
+                        </p>
                     </div>
 
                     <div class="d-grid gap-2 col-1 mx-auto mb-3">
@@ -46,7 +46,79 @@
         </div>
     </div>
 
-    <script src="../js/login.js"></script>
+    <script>
+        const { BASE_URL } = require("../js/utils");
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('loginForm');
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const notificationArea = document.getElementById('notificationArea');
+
+            function showNotification(message, isError = false) {
+                notificationArea.style.display = 'block';
+                notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+                notificationArea.textContent = message;
+
+                setTimeout(() => {
+                    notificationArea.style.display = 'none';
+                }, 3000);
+            }
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const username = document.getElementById('username').value;
+                const password = passwordInput.value;
+
+                try {
+                    const response = await fetch(`${BASE_URL}/user/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.token) {
+                        sessionStorage.setItem('token', data.token);
+                        sessionStorage.setItem('userData', JSON.stringify(data.user));
+                        sessionStorage.setItem('loginMessage', data.message);
+
+                        showNotification('Login successful! Redirecting...', false);
+                        setTimeout(() => {
+                            window.location.href = '../dashboard.html';
+                        }, 1000);
+                    } else {
+                        showNotification(data.message, true);
+                    }
+                } catch (error) {
+                    console.error('Error during login:', error);
+                    showNotification('Login failed! Please try again.', true);
+                }
+            });
+
+            togglePassword.addEventListener('click', () => {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    togglePassword.textContent = 'Hide';
+                } else {
+                    passwordInput.type = 'password';
+                    togglePassword.textContent = 'Show';
+                }
+            });
+
+            if (sessionStorage.getItem('userLogged') === 'true') {
+                window.location.href = '../dashboard.html';
+            }
+        });
+
+        function handleLogout() {
+            sessionStorage.clear();
+            window.location.href = '../login.html';
+        }
+
+    </script>
 </body>
 
 </html>
