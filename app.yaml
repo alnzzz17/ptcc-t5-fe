@@ -1,2 +1,26 @@
 runtime: nodejs20
 service: app-t6
+
+handlers:
+  - url: /
+    static_files: login.html
+    upload: login.html
+
+  - url: /register
+    static_files: register.html
+    upload: register.html
+
+  - url: /dashboard
+    static_files: dashboard.html
+    upload: dashboard.html
+
+  - url: /css
+    static_dir: css
+
+  - url: /js
+    static_dir: js
+
+
+  - url: /(.*)
+    static_files: \1
+    upload: (.*)
