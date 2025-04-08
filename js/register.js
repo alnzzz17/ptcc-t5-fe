@@ -1,3 +1,5 @@
+const { BASE_URL } = require("../utils");
+
 document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('registerForm');
     const togglePassword = document.getElementById('togglePassword');
@@ -22,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = passwordInput.value;
 
         try {
-            const response = await fetch('http://localhost:5000/user/register', {
+            const response = await fetch(`${BASE_URL}/user/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, fullName, password })
@@ -33,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'success') {
                 showNotification('Registration successful! Redirecting to login page...', false);
                 setTimeout(() => {
-                    window.location.href = '../pages/login.html';
+                    window.location.href = '../login.html';
                 }, 1000);
             } else {
                 showNotification(data.message, true);

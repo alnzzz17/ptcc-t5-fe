@@ -1,3 +1,5 @@
+const { BASE_URL } = require("../utils");
+
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const togglePassword = document.getElementById('togglePassword');
@@ -21,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = passwordInput.value;
 
         try {
-            const response = await fetch('http://localhost:5000/user/login', {
+            const response = await fetch(`${BASE_URL}/user/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -36,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 showNotification('Login successful! Redirecting...', false);
                 setTimeout(() => {
-                    window.location.href = '../pages/dashboard.html';
+                    window.location.href = '../dashboard.html';
                 }, 1000);
             } else {
                 showNotification(data.message, true);
@@ -58,11 +60,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (sessionStorage.getItem('userLogged') === 'true') {
-        window.location.href = '../pages/dashboard.html';
+        window.location.href = '../dashboard.html';
     }
 });
 
 function handleLogout() {
     sessionStorage.clear();
-    window.location.href = '../pages/login.html';
+    window.location.href = '../login.html';
 }

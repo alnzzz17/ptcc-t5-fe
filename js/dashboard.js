@@ -18,7 +18,7 @@ function decodeToken(token) {
 const token = sessionStorage.getItem("token");
 
 if (!token) {
-    window.location.href = "../pages/login.html"; // Redirect ke login jika tidak ada token
+    window.location.href = "../login.html"; // Redirect ke login jika tidak ada token
 } else {
     const decoded = decodeToken(token);
     if (decoded) {
@@ -35,7 +35,7 @@ function handleLogout() {
     const confirmLogout = confirm("Are you sure you want to logout?");
     if (confirmLogout) {
         sessionStorage.clear();
-        window.location.href = "../pages/login.html";
+        window.location.href = "../login.html";
     }
 }
 
@@ -74,7 +74,7 @@ document.getElementById("accountForm").addEventListener("submit", function (e) {
         password: document.getElementById("editPassword").value
     };
 
-    fetch("http://localhost:5000/user/edit", {
+    fetch(`${BASE_URL}/user/edit`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
@@ -102,7 +102,7 @@ function deleteAccount() {
         const userData = decodeToken(token); // Decode token untuk mendapatkan id pengguna
         const userId = userData.id; // Ambil id pengguna dari token
 
-        fetch(`http://localhost:5000/user/delete/${userId}`, {
+        fetch(`${BASE_URL}/user/delete/${userId}`, {
             method: "DELETE",
             headers: {
                 "Authorization": `Bearer ${token}`
@@ -127,7 +127,7 @@ document.getElementById("deleteAccountBtn").addEventListener("click", deleteAcco
 
 // Fungsi untuk mengambil dan menampilkan catatan
 function fetchNotes() {
-    fetch("http://localhost:5000/note/all", {
+    fetch(`${BASE_URL}/note/all`, {
         method: "GET",
         headers: {
             "Authorization": `Bearer ${token}`,
@@ -201,8 +201,8 @@ function saveNote() {
 
     const method = noteId ? "PUT" : "POST";
     const url = noteId
-        ? `http://localhost:5000/note/edit/${noteId}`
-        : "http://localhost:5000/note/new";
+        ? `${BASE_URL}/note/edit/${noteId}`
+        : `${BASE_URL}/note/new`;
 
     fetch(url, {
         method: method,
@@ -232,7 +232,7 @@ function saveNote() {
 function deleteNote(noteId) {
     if (!confirm("Are you sure you want to delete this note?")) return;
 
-    fetch(`http://localhost:5000/note/delete/${noteId}`, {
+    fetch(`${BASE_URL}/note/delete/${noteId}`, {
         method: "DELETE",
         headers: {
             "Authorization": `Bearer ${token}`
