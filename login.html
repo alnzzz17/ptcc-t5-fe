@@ -78,8 +78,8 @@
                     const response = await fetch(`${BASE_URL}/api/user/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password }),
-                        credentials: 'include'
+                        credentials: 'include',
+                        body: JSON.stringify({ username, password })
                     });
 
                     const data = await response.json();
@@ -99,7 +99,7 @@
                     }
                 } catch (error) {
                     console.error('Error during login:', error);
-                    showNotification('Login failed! Please try again.', true);
+                    showNotification(data.message || 'Login failed! Please try again.', true);
                 }
             });
 

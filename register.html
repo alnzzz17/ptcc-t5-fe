@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (error) {
       console.error('Error:', error);
-      showNotification('An error occurred on the server', true);
+     showNotification(data.message || 'An error occurred on the server! Please try again.', true);
     }
   });
 
