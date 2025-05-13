@@ -71,34 +71,33 @@
             }
 
             registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const fullName = document.getElementById('fullName').value;
+    const password = document.getElementById('password').value;
 
-                const username = document.getElementById('username').value;
-                const fullName = document.getElementById('fullName').value;
-                const password = passwordInput.value;
+    try {
+        const response = await fetch(`${BASE_URL}/user/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, fullName, password })
+        });
 
-                try {
-                    const response = await fetch(`${BASE_URL}/user/register`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, fullName, password })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.status === 'success') {
-                        showNotification('Registration successful! Redirecting to login page...', false);
-                        setTimeout(() => {
-                            window.location.href = '../login.html';
-                        }, 1000);
-                    } else {
-                        showNotification(data.message, true);
-                    }
-                } catch (error) {
-                    showNotification('Terjadi kesalahan pada server', true);
-                    console.error('Error:', error);
-                }
-            });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showNotification('Registration successful! Redirecting to login...', false);
+            setTimeout(() => {
+                window.location.href = '../login.html';
+            }, 1500);
+        } else {
+            showNotification(data.message || 'Registration failed', true);
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        showNotification('Registration failed! Please try again.', true);
+    }
+});
 
             togglePassword.addEventListener('click', () => {
                 if (passwordInput.type === 'password') {

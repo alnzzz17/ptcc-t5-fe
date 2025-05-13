@@ -114,6 +114,60 @@
     <script src="./js/utils.js"></script>
 
     <script>
+        // Add this at the top of your dashboard script
+        let accessToken = sessionStorage.getItem('accessToken');
+        if (!accessToken) {
+            window.location.href = '../login.html';
+        }
+
+        async function fetchWithAuth(url, options = {}) {
+            try {
+                // First try with current access token
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    credentials: 'include'
+                });
+
+                // If token expired, try to refresh
+                if (response.status === 401) {
+                    const refreshResponse = await fetch(`${BASE_URL}/user/refresh`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+
+                    if (refreshResponse.ok) {
+                        const { accessToken: newToken } = await refreshResponse.json();
+                        sessionStorage.setItem('accessToken', newToken);
+                        accessToken = newToken;
+
+                        // Retry original request with new token
+                        return fetch(url, {
+                            ...options,
+                            headers: {
+                                ...options.headers,
+                                'Authorization': `Bearer ${newToken}`
+                            },
+                            credentials: 'include'
+                        });
+                    } else {
+                        // Refresh failed - force logout
+                        sessionStorage.clear();
+                        window.location.href = '../login.html';
+                        return Promise.reject('Session expired');
+                    }
+                }
+
+                return response;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw error;
+            }
+        }
+
         // Fungsi untuk decode token JWT
         function decodeToken(accessToken) {
             try {
@@ -129,9 +183,6 @@
                 return null;
             }
         }
-
-        // Ambil token dari sessionStorage
-        const token = sessionStorage.getItem("token");
 
         if (!token) {
             window.location.href = "../login.html"; // Redirect ke login jika tidak ada token
@@ -190,7 +241,7 @@
                 password: document.getElementById("editPassword").value
             };
 
-            fetch(`${BASE_URL}/user/edit`, {
+            fetchWithAuth(`${BASE_URL}/user/edit`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -218,7 +269,7 @@
                 const userData = decodeToken(token); // Decode token untuk mendapatkan id pengguna
                 const userId = userData.id; // Ambil id pengguna dari token
 
-                fetch(`${BASE_URL}/user/delete/${userId}`, {
+                fetchWithAuth(`${BASE_URL}/user/delete/${userId}`, {
                     method: "DELETE",
                     headers: {
                         "Authorization": `Bearer ${accessToken}`
@@ -243,7 +294,7 @@
 
         // Fungsi untuk mengambil dan menampilkan catatan
         function fetchNotes() {
-            fetch(`${BASE_URL}/note/all`, {
+            fetchWithAuth(`${BASE_URL}/note/all`, {
                 method: "GET",
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,
@@ -320,7 +371,7 @@
                 ? `${BASE_URL}/note/edit/${noteId}`
                 : `${BASE_URL}/note/new`;
 
-            fetch(url, {
+            fetchWithAuth(url, {
                 method: method,
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,
@@ -348,7 +399,7 @@
         function deleteNote(noteId) {
             if (!confirm("Are you sure you want to delete this note?")) return;
 
-            fetch(`${BASE_URL}/note/delete/${noteId}`, {
+            fetchWithAuth(`${BASE_URL}/note/delete/${noteId}`, {
                 method: "DELETE",
                 headers: {
                     "Authorization": `Bearer ${accessToken}`
@@ -369,4 +420,5 @@
         document.addEventListener("DOMContentLoaded", fetchNotes);
     </script>
 </body>
+
 </html>

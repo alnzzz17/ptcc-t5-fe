@@ -66,37 +66,38 @@
             }
 
             loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
 
-                const username = document.getElementById('username').value;
-                const password = passwordInput.value;
+    try {
+        const response = await fetch(`${BASE_URL}/user/login`, {
+            method: 'POST',
+            credentials: 'include', // Needed for cookies
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
 
-                try {
-                    const response = await fetch(`${BASE_URL}/user/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok && data.accessToken) {
-                        sessionStorage.setItem('token', data.accessToken);
-                        sessionStorage.setItem('userData', JSON.stringify(data.user));
-                        sessionStorage.setItem('loginMessage', data.message);
-
-                        showNotification('Login successful! Redirecting...', false);
-                        setTimeout(() => {
-                            window.location.href = '../dashboard.html';
-                        }, 1000);
-                    } else {
-                        showNotification(data.message, true);
-                    }
-                } catch (error) {
-                    console.error('Error during login:', error);
-                    showNotification('Login failed! Please try again.', true);
-                }
-            });
+        const data = await response.json();
+        
+        if (response.ok && data.accessToken) {
+            // Store access token in sessionStorage
+            sessionStorage.setItem('accessToken', data.accessToken);
+            sessionStorage.setItem('userData', JSON.stringify(data.user));
+            
+            showNotification('Login successful! Redirecting...', false);
+            
+            setTimeout(() => {
+                window.location.href = '../dashboard.html';
+            }, 1000);
+        } else {
+            showNotification(data.message || 'Login failed', true);
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showNotification('Login failed! Please try again.', true);
+    }
+});
 
             togglePassword.addEventListener('click', () => {
                 if (passwordInput.type === 'password') {
