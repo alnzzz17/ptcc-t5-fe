@@ -53,81 +53,64 @@
 
     <script src="./js/utils.js"></script>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const registerForm = document.getElementById('registerForm');
-  const togglePassword = document.getElementById('togglePassword');
-  const passwordInput = document.getElementById('password');
-  const notificationArea = document.getElementById('notificationArea');
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const registerForm = document.getElementById('registerForm');
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const notificationArea = document.getElementById('notificationArea');
 
-  function showNotification(message, isError = false) {
-    notificationArea.style.display = 'block';
-    notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
-    notificationArea.textContent = message;
-    setTimeout(() => {
-      notificationArea.style.display = 'none';
-    }, 3000);
-  }
+            function showNotification(message, isError = false) {
+                notificationArea.style.display = 'block';
+                notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+                notificationArea.textContent = message;
 
-  registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const username = document.getElementById('username').value.trim();
-    const fullName = document.getElementById('fullName').value.trim();
-    const password = document.getElementById('password').value;
+                setTimeout(() => {
+                    notificationArea.style.display = 'none';
+                }, 3000);
+            }
 
-    // Validasi input
-    if (!username || !fullName || !password) {
-      showNotification('All fields are required!', true);
-      return;
-    }
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
 
-    if (password.length < 6) {
-      showNotification('Password must be at least 6 characters', true);
-      return;
-    }
+                const username = document.getElementById('username').value;
+                const fullName = document.getElementById('fullName').value;
+                const password = passwordInput.value;
 
-    try {
-      const response = await fetch(`${BASE_URL}/user/register`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify({ username, fullName, password })
-      });
+                try {
+                    const response = await fetch(`${BASE_URL}/user/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, fullName, password })
+                    });
 
-      const data = await response.json();
+                    const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
-      }
+                    if (data.status === 'success') {
+                        showNotification('Registration successful! Redirecting to login page...', false);
+                        setTimeout(() => {
+                            window.location.href = '../login.html';
+                        }, 1000);
+                    } else {
+                        showNotification(data.message, true);
+                    }
+                } catch (error) {
+                    showNotification('Terjadi kesalahan pada server', true);
+                    console.error('Error:', error);
+                }
+            });
 
-      if (data.status === 'success') {
-        showNotification('Registration successful! Redirecting to login...', false);
-        setTimeout(() => {
-          window.location.href = '../login.html';
-        }, 1500);
-      } else {
-        showNotification(data.message || 'Registration failed', true);
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      showNotification(error.message || 'Registration failed! Please try again.', true);
-    }
-  });
-
-  togglePassword.addEventListener('click', () => {
-    if (passwordInput.type === 'password') {
-      passwordInput.type = 'text';
-      togglePassword.textContent = 'Hide';
-    } else {
-      passwordInput.type = 'password';
-      togglePassword.textContent = 'Show';
-    }
-  });
-});
-</script>
-
+            togglePassword.addEventListener('click', () => {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    togglePassword.textContent = 'Hide';
+                } else {
+                    passwordInput.type = 'password';
+                    togglePassword.textContent = 'Show';
+                }
+            });
+        });
+    </script>
 </body>
 
 </html>
