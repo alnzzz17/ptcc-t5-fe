@@ -21,6 +21,7 @@
     /* nambahin ellip kalau konten kepanjangan */
     display: -webkit-box;
     -webkit-line-clamp: 5;
+    line-clamp: 5;
     /* Batasi jumlah baris konten */
     -webkit-box-orient: vertical;
 }
