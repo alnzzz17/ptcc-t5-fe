@@ -449,6 +449,7 @@
                     }
 
                     const data = await response.json();
+                    console.log('Update account response:', data); // Debugging
 
                     if (data.status === 'success') {
                         alert('Account updated successfully!');
@@ -457,7 +458,9 @@
                             localStorage.setItem('userData', JSON.stringify(data.data));
                             document.getElementById('fullName').innerText = data.data.fullName;
                         }
-                        bootstrap.Modal.getInstance(document.getElementById('accountModal')).hide();
+                        // Hide the modal
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('accountModal'));
+                        if (modal) modal.hide();
                     } else {
                         alert('Error updating account: ' + (data.message || 'Unknown error'));
                     }
@@ -467,9 +470,14 @@
                 }
             }
 
-            // Set up event listeners (add this in your existing event listeners section)
+            // Set up event listeners - add this in your existing event listeners section
             document.getElementById('saveAccountBtn')?.addEventListener('click', updateAccount);
 
+            // Form submission handler
+            document.getElementById('accountForm')?.addEventListener('submit', function (e) {
+                e.preventDefault();
+                updateAccount();
+            });
 
             // Function to delete account
             async function deleteAccount() {
@@ -520,13 +528,6 @@
                     }
                 });
             }
-
-            // Keep your existing form submission handler but modify it to prevent default behavior
-            document.getElementById('accountForm')?.addEventListener('submit', function (e) {
-                e.preventDefault();
-                updateAccount();
-            });
-
             // Handle delete account button
             document.getElementById('deleteAccountBtn')?.addEventListener('click', deleteAccount);
 
