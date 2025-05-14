@@ -36,14 +36,69 @@
         </div>
     </div>
 
-    <!-- Modal Tambah/Edit Note -->
-    <div class="modal fade" id="noteModal" tabindex="-1">
-        <!-- Modal content remains the same -->
+    <!-- Note Modal -->
+    <div class="modal fade" id="noteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">New Note</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="noteForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="noteId">
+                        <div class="mb-3">
+                            <label for="noteTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="noteTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="noteContent" class="form-label">Content</label>
+                            <textarea class="form-control" id="noteContent" rows="5" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
-    <!-- Modal Edit Akun -->
-    <div class="modal fade" id="accountModal" tabindex="-1">
-        <!-- Modal content remains the same -->
+    <!-- Account Modal -->
+    <div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="accountForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editUsername" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="editUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editFullName" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="editFullName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editPassword" class="form-label">New Password (leave blank to keep current)</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="editPassword">
+                                <button type="button" class="btn btn-outline-secondary" id="togglePassword">Show</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-danger" id="deleteAccountBtn">Delete Account</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script src="./js/utils.js"></script>
@@ -174,7 +229,6 @@
                 }
             }
 
-
             // Logout function
             async function handleLogout() {
                 if (confirm('Are you sure you want to logout?')) {
@@ -202,6 +256,7 @@
                     }
 
                     const data = await response.json();
+                    console.log('Notes data:', data); // Debugging
 
                     if (data.status === 'success') {
                         // Ensure data.data is an array
@@ -213,12 +268,10 @@
                         }
                     } else {
                         console.error('Failed to fetch notes:', data.message);
-                        alert('Failed to fetch notes: ' + (data.message || 'Unknown error'));
                         displayNotes([]); // Show empty state
                     }
                 } catch (error) {
                     console.error('Error fetching notes:', error);
-                    alert('Error fetching notes: ' + error.message);
                     displayNotes([]); // Show empty state
 
                     // If unauthorized, redirect to login
@@ -227,6 +280,7 @@
                     }
                 }
             }
+
             // Function to display notes
             function displayNotes(notes) {
                 const container = document.getElementById('notes-container');
@@ -236,7 +290,7 @@
 
                 // Check if notes is an array and not empty
                 if (!Array.isArray(notes) || notes.length === 0) {
-                    container.innerHTML = '<p class="text-center">No notes found</p>';
+                    container.innerHTML = '<p class="text-center w-100">No notes found</p>';
                     return;
                 }
 
@@ -247,51 +301,60 @@
                     const noteCard = document.createElement('div');
                     noteCard.className = 'col';
 
-                    // Ensure note content exists before processing
-                    const noteContent = note.noteContent || '';
-                    const noteTitle = note.noteTitle || 'Untitled Note';
-
-                    // Escape HTML in note content to prevent XSS
-                    const escapedContent = String(noteContent)
-                        .replace(/&/g, "&amp;")
-                        .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;")
-                        .replace(/"/g, "&quot;")
-                        .replace(/'/g, "&#039;")
-                        .replace(/\n/g, '<br>');
-
-                    const escapedTitle = String(noteTitle)
-                        .replace(/&/g, "&amp;")
-                        .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;")
-                        .replace(/"/g, "&quot;")
-                        .replace(/'/g, "&#039;");
-
-                    // Ensure note.id exists
+                    // Ensure note properties exist
                     const noteId = note.id || '';
+                    const noteTitle = note.noteTitle || 'Untitled Note';
+                    const noteContent = note.noteContent || '';
 
-                    noteCard.innerHTML = `
-            <div class="card shadow-sm rounded-lg note-card">
-                <div class="card-header fw-bold">${escapedTitle}</div>
-                <div class="card-body">
-                    <p class="card-text text-muted note-content">${escapedContent}</p>
-                    <div class="d-flex justify-content-center button-container">
-                        <button class="btn btn-danger" onclick="deleteNote('${noteId}')">DELETE</button>
-                        <button class="btn btn-primary" onclick="openEditModal('${noteId}', '${escapedTitle.replace(/'/g, "\\'")}', '${noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
-                    </div>
-                </div>
-            </div>
-        `;
+                    // Create card elements
+                    const card = document.createElement('div');
+                    card.className = 'card shadow-sm rounded-lg note-card h-100';
+
+                    const cardHeader = document.createElement('div');
+                    cardHeader.className = 'card-header fw-bold';
+                    cardHeader.textContent = noteTitle;
+
+                    const cardBody = document.createElement('div');
+                    cardBody.className = 'card-body d-flex flex-column';
+
+                    const content = document.createElement('p');
+                    content.className = 'card-text text-muted note-content flex-grow-1';
+                    content.textContent = noteContent;
+
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'd-flex justify-content-center button-container gap-2 mt-3';
+
+                    // Create buttons with event listeners
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-danger';
+                    deleteBtn.textContent = 'DELETE';
+                    deleteBtn.addEventListener('click', () => deleteNote(noteId));
+
+                    const openBtn = document.createElement('button');
+                    openBtn.className = 'btn btn-primary';
+                    openBtn.textContent = 'OPEN';
+                    openBtn.addEventListener('click', () => openEditModal(noteId, noteTitle, noteContent));
+
+                    // Build the card structure
+                    buttonContainer.appendChild(deleteBtn);
+                    buttonContainer.appendChild(openBtn);
+                    cardBody.appendChild(content);
+                    cardBody.appendChild(buttonContainer);
+                    card.appendChild(cardHeader);
+                    card.appendChild(cardBody);
+                    noteCard.appendChild(card);
                     container.appendChild(noteCard);
                 });
             }
+
             // Function to open create note modal
             function openCreateModal() {
                 document.getElementById('modalTitle').innerText = 'New Note';
                 document.getElementById('noteId').value = '';
                 document.getElementById('noteTitle').value = '';
                 document.getElementById('noteContent').value = '';
-                new bootstrap.Modal(document.getElementById('noteModal')).show();
+                const modal = new bootstrap.Modal(document.getElementById('noteModal'));
+                modal.show();
             }
 
             // Function to open edit note modal
@@ -299,8 +362,9 @@
                 document.getElementById('modalTitle').innerText = 'Edit Note';
                 document.getElementById('noteId').value = id;
                 document.getElementById('noteTitle').value = title;
-                document.getElementById('noteContent').value = content.replace(/\\n/g, '\n');
-                new bootstrap.Modal(document.getElementById('noteModal')).show();
+                document.getElementById('noteContent').value = content;
+                const modal = new bootstrap.Modal(document.getElementById('noteModal'));
+                modal.show();
             }
 
             // Function to save note
@@ -463,12 +527,10 @@
                 saveNote();
             });
 
-            // Expose functions to global scope for HTML onclick attributes
-            window.deleteNote = deleteNote;
-            window.openEditModal = openEditModal;
+            // Expose functions to global scope
+            window.handleLogout = handleLogout;
             window.openCreateModal = openCreateModal;
         });
     </script>
 </body>
-
 </html>
