@@ -253,37 +253,26 @@
                 try {
                     const response = await makeAuthenticatedRequest(`${BASE_URL}/notes/all`);
 
-                    // Check if response is OK
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
                     const data = await response.json();
-                    console.log('Notes data:', data); // Debugging
+                    console.log('API Response:', data); // Debugging log
 
                     if (data.status === 'success') {
-                        // Ensure data.data is an array
-                        if (Array.isArray(data.data)) {
-                            displayNotes(data.data);
-                        } else {
-                            console.error('Invalid notes data format:', data.data);
-                            displayNotes([]); // Show empty state
-                        }
+                        // Check the actual structure of your response
+                        const notes = data.data || data.notes || [];
+                        displayNotes(notes);
                     } else {
-                        console.error('Failed to fetch notes:', data.message);
-                        displayNotes([]); // Show empty state
+                        console.error('API Error:', data.message);
+                        displayNotes([]);
                     }
                 } catch (error) {
-                    console.error('Error fetching notes:', error);
-                    displayNotes([]); // Show empty state
-
-                    // If unauthorized, redirect to login
-                    if (error.message.includes('Unauthorized') || error.message.includes('Session expired')) {
-                        handleLogout();
-                    }
+                    console.error('Fetch Error:', error);
+                    displayNotes([]);
                 }
             }
-
             // Function to display notes
             function displayNotes(notes) {
                 const container = document.getElementById('notes-container');
@@ -291,25 +280,22 @@
 
                 container.innerHTML = '';
 
-                // Check if notes is an array and not empty
                 if (!Array.isArray(notes) || notes.length === 0) {
                     container.innerHTML = '<p class="text-center w-100">No notes found</p>';
                     return;
                 }
 
                 notes.forEach((note) => {
-                    // Skip if note is invalid
                     if (!note || typeof note !== 'object') return;
 
                     const noteCard = document.createElement('div');
                     noteCard.className = 'col';
 
-                    // Ensure note properties exist
-                    const noteId = note.id || '';
-                    const noteTitle = note.noteTitle || 'Untitled Note';
-                    const noteContent = note.noteContent || '';
+                    // Make sure to use the correct property names that match your API response
+                    const noteId = note.id || note._id || '';
+                    const noteTitle = note.noteTitle || note.title || 'Untitled Note';
+                    const noteContent = note.noteContent || note.content || 'No content';
 
-                    // Create card elements
                     const card = document.createElement('div');
                     card.className = 'card shadow-sm rounded-lg note-card h-100';
 
@@ -327,7 +313,6 @@
                     const buttonContainer = document.createElement('div');
                     buttonContainer.className = 'd-flex justify-content-center button-container gap-2 mt-3';
 
-                    // Create buttons with event listeners
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'btn btn-danger';
                     deleteBtn.textContent = 'DELETE';
@@ -338,7 +323,6 @@
                     openBtn.textContent = 'OPEN';
                     openBtn.addEventListener('click', () => openEditModal(noteId, noteTitle, noteContent));
 
-                    // Build the card structure
                     buttonContainer.appendChild(deleteBtn);
                     buttonContainer.appendChild(openBtn);
                     cardBody.appendChild(content);
@@ -371,6 +355,7 @@
             }
 
             // Function to save note
+            // In your JavaScript code, replace the saveNote function with this:
             async function saveNote() {
                 const noteId = document.getElementById('noteId').value;
                 const noteTitle = document.getElementById('noteTitle').value;
@@ -390,8 +375,15 @@
 
                     const response = await makeAuthenticatedRequest(url, {
                         method,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
                         body: JSON.stringify({ noteTitle, noteContent })
                     });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
 
                     const data = await response.json();
 
@@ -406,6 +398,9 @@
                     alert('An error occurred while saving the note: ' + error.message);
                 }
             }
+
+            // Also add this event listener at the end of your script:
+            document.querySelector('#noteModal .btn-primary').addEventListener('click', saveNote);
 
             // Function to delete note
             async function deleteNote(noteId) {
