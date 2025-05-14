@@ -49,70 +49,68 @@
     <script src="./js/utils.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const loginForm = document.getElementById('loginForm');
-            const togglePassword = document.getElementById('togglePassword');
-            const passwordInput = document.getElementById('password');
-            const notificationArea = document.getElementById('notificationArea');
+    const loginForm = document.getElementById('loginForm');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const notificationArea = document.getElementById('notificationArea');
 
-            function showNotification(message, isError = false) {
-                notificationArea.style.display = 'block';
-                notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
-                notificationArea.textContent = message;
+    function showNotification(message, isError = false) {
+        notificationArea.style.display = 'block';
+        notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+        notificationArea.textContent = message;
+        setTimeout(() => {
+            notificationArea.style.display = 'none';
+        }, 3000);
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!username || !password) {
+            showNotification('Username and password are required', true);
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/user/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Simpan access token dan user data
+                localStorage.setItem('accessToken', data.accessToken);
+                localStorage.setItem('userData', JSON.stringify(data.user));
+                
+                showNotification('Login successful! Redirecting...', false);
                 setTimeout(() => {
-                    notificationArea.style.display = 'none';
-                }, 3000);
+                    window.location.href = './dashboard.html';
+                }, 1000);
+            } else {
+                showNotification(data.message || 'Login failed', true);
             }
+        } catch (error) {
+            console.error('Error during login:', error);
+            showNotification('Login failed! Please try again.', true);
+        }
+    });
 
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const username = document.getElementById('username').value.trim();
-                const password = passwordInput.value.trim();
-
-                // Validasi input
-                if (!username || !password) {
-                    showNotification('Username and password are required', true);
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`${BASE_URL}/api/user/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ username, password })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        // Simpan data yang diperlukan
-                        sessionStorage.setItem('accessToken', data.accessToken);
-                        sessionStorage.setItem('userData', JSON.stringify(data.user));
-
-                        showNotification(data.message || 'Login successful! Redirecting...', false);
-
-                        setTimeout(() => {
-                            window.location.href = '../dashboard.html';
-                        }, 1000);
-                    } else {
-                        showNotification(data.message || 'Login failed', true);
-                    }
-                } catch (error) {
-                    console.error('Error during login:', error);
-                    showNotification(data.message || 'Login failed! Please try again.', true);
-                }
-            });
-
-            togglePassword.addEventListener('click', () => {
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    togglePassword.textContent = 'Hide';
-                } else {
-                    passwordInput.type = 'password';
-                    togglePassword.textContent = 'Show';
-                }
-            });
-        });
+    togglePassword.addEventListener('click', () => {
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            togglePassword.textContent = 'Hide';
+        } else {
+            passwordInput.type = 'password';
+            togglePassword.textContent = 'Show';
+        }
+    });
+});
     </script>
 </body>
 

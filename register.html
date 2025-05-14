@@ -54,73 +54,70 @@
     <script src="./js/utils.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const registerForm = document.getElementById('registerForm');
-            const togglePassword = document.getElementById('togglePassword');
-            const passwordInput = document.getElementById('password');
-            const notificationArea = document.getElementById('notificationArea');
+       document.addEventListener('DOMContentLoaded', () => {
+    const registerForm = document.getElementById('registerForm');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const notificationArea = document.getElementById('notificationArea');
 
-            function showNotification(message, isError = false) {
-                notificationArea.style.display = 'block';
-                notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
-                notificationArea.textContent = message;
+    function showNotification(message, isError = false) {
+        notificationArea.style.display = 'block';
+        notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+        notificationArea.textContent = message;
+        setTimeout(() => {
+            notificationArea.style.display = 'none';
+        }, 3000);
+    }
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const fullName = document.getElementById('fullName').value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!username || !fullName || !password) {
+            showNotification('All fields are required', true);
+            return;
+        }
+
+        if (password.length < 6) {
+            showNotification('Password must be at least 6 characters', true);
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/user/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, fullName, password })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                showNotification('Registration successful! Redirecting to login page...', false);
                 setTimeout(() => {
-                    notificationArea.style.display = 'none';
-                }, 3000);
+                    window.location.href = './login.html';
+                }, 1000);
+            } else {
+                showNotification(data.message || 'Registration failed', true);
             }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('An error occurred on the server! Please try again.', true);
+        }
+    });
 
-            registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const username = document.getElementById('username').value.trim();
-                const fullName = document.getElementById('fullName').value.trim();
-                const password = passwordInput.value.trim();
-
-                // Validasi input
-                if (!username || !fullName || !password) {
-                    showNotification('All fields are required', true);
-                    return;
-                }
-
-                if (password.length < 6) {
-                    showNotification('Password must be at least 6 characters', true);
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`${BASE_URL}/api/user/register`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ username, fullName, password })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        showNotification('Registration successful! Redirecting to login page...', false);
-                        setTimeout(() => {
-                            window.location.href = '../login.html';
-                        }, 1000);
-                    } else {
-                        showNotification(data.message || 'Registration failed', true);
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showNotification(data.message || 'An error occurred on the server! Please try again.', true);
-                }
-            });
-
-            togglePassword.addEventListener('click', () => {
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    togglePassword.textContent = 'Hide';
-                } else {
-                    passwordInput.type = 'password';
-                    togglePassword.textContent = 'Show';
-                }
-            });
-        });
-    </script>
+    togglePassword.addEventListener('click', () => {
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            togglePassword.textContent = 'Hide';
+        } else {
+            passwordInput.type = 'password';
+            togglePassword.textContent = 'Show';
+        }
+    });
+});</script>
 </body>
 
 </html>
