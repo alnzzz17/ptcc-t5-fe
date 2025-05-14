@@ -436,7 +436,6 @@
                 }
 
                 try {
-                    // Remove the user ID from the URL
                     const response = await makeAuthenticatedRequest(`${BASE_URL}/user/edit`, {
                         method: 'PUT',
                         headers: {
@@ -454,11 +453,18 @@
 
                     if (data.status === 'success') {
                         alert('Account updated successfully!');
+
                         // Update user data in localStorage
                         if (data.data) {
                             localStorage.setItem('userData', JSON.stringify(data.data));
                             document.getElementById('fullName').innerText = data.data.fullName;
+
+                            // Update the modal fields with new data
+                            document.getElementById('editUsername').value = data.data.username || '';
+                            document.getElementById('editFullName').value = data.data.fullName || '';
+                            document.getElementById('editPassword').value = '';
                         }
+
                         // Hide the modal
                         const modal = bootstrap.Modal.getInstance(document.getElementById('accountModal'));
                         if (modal) modal.hide();
@@ -470,6 +476,7 @@
                     alert('An error occurred while updating account: ' + error.message);
                 }
             }
+
             // Set up event listeners - add this in your existing event listeners section
             document.getElementById('saveAccountBtn')?.addEventListener('click', updateAccount);
 
@@ -508,9 +515,13 @@
 
             // Set up event listeners
             document.getElementById('accountBtn')?.addEventListener('click', function () {
-                document.getElementById('editUsername').value = userData.username || '';
-                document.getElementById('editFullName').value = userData.fullName || '';
+                // Always get fresh data from localStorage
+                const currentUserData = JSON.parse(localStorage.getItem('userData')) || {};
+
+                document.getElementById('editUsername').value = currentUserData.username || '';
+                document.getElementById('editFullName').value = currentUserData.fullName || '';
                 document.getElementById('editPassword').value = '';
+
                 new bootstrap.Modal(document.getElementById('accountModal')).show();
             });
 
