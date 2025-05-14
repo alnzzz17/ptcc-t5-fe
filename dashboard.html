@@ -436,6 +436,7 @@
                 }
 
                 try {
+                    // Remove the user ID from the URL
                     const response = await makeAuthenticatedRequest(`${BASE_URL}/user/edit`, {
                         method: 'PUT',
                         headers: {
@@ -449,7 +450,7 @@
                     }
 
                     const data = await response.json();
-                    console.log('Update account response:', data); // Debugging
+                    console.log('Update account response:', data);
 
                     if (data.status === 'success') {
                         alert('Account updated successfully!');
@@ -469,7 +470,6 @@
                     alert('An error occurred while updating account: ' + error.message);
                 }
             }
-
             // Set up event listeners - add this in your existing event listeners section
             document.getElementById('saveAccountBtn')?.addEventListener('click', updateAccount);
 
