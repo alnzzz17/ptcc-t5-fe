@@ -46,348 +46,236 @@
 
     <script src="./js/utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Fungsi untuk decode token JWT
-        function decodeToken(token) {
-            try {
-                const base64Url = token.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(
-                    atob(base64)
-                        .split('')
-                        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-                        .join('')
-                );
-                return JSON.parse(jsonPayload);
-            } catch (error) {
-                console.error("Invalid token", error);
-                return null;
-            }
+<script>
+  // Fungsi untuk decode token JWT
+  function decodeToken(token) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Invalid token', error);
+      return null;
+    }
+  }
+
+  // Cek authentication - menggunakan localStorage seperti di login
+  const accessToken = localStorage.getItem('accessToken');
+  const userData = JSON.parse(localStorage.getItem('userData')) || {};
+
+  if (!accessToken) {
+    window.location.href = './login.html';
+    return;
+  }
+
+  // Verifikasi token sebelum melanjutkan
+  const decodedToken = decodeToken(accessToken);
+  if (!decodedToken) {
+    localStorage.clear();
+    window.location.href = './login.html';
+    return;
+  }
+
+  // Set user data
+  document.getElementById('fullName').innerText = userData.fullName || 'User';
+
+  // Fungsi untuk refresh token
+  async function refreshAccessToken() {
+    try {
+      const response = await fetch(`${BASE_URL}/user/refresh`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+        return data.accessToken;
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      handleLogout();
+      return null;
+    }
+  }
+
+  // Fungsi untuk membuat request dengan token
+  async function makeAuthenticatedRequest(url, options = {}) {
+    let token = localStorage.getItem('accessToken');
+    
+    // Set default headers
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers
+    };
+
+    try {
+      let response = await fetch(url, { ...options, headers });
+      
+      // Jika token expired, coba refresh
+      if (response.status === 401) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          headers['Authorization'] = `Bearer ${newToken}`;
+          response = await fetch(url, { ...options, headers });
+        } else {
+          throw new Error('Session expired. Please login again.');
         }
+      }
 
-        // Fungsi untuk refresh token
-        async function refreshToken() {
-            try {
-                const response = await fetch(`${BASE_URL}/user/refresh`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
+      return response;
+    } catch (error) {
+      console.error('Request failed:', error);
+      throw error;
+    }
+  }
 
-                if (!response.ok) {
-                    throw new Error('Failed to refresh token');
-                }
-
-                const data = await response.json();
-                if (data.accessToken) {
-                    sessionStorage.setItem('accessToken', data.accessToken);
-                    return true;
-                }
-                return false;
-            } catch (error) {
-                console.error('Error refreshing token:', error);
-                return false;
-            }
-        }
-
-        // Cek authentication dan token
-        async function checkAuth() {
-            const accessToken = sessionStorage.getItem('accessToken');
-            
-            if (!accessToken) {
-                window.location.href = './login.html';
-                return false;
-            }
-
-            // Verifikasi token
-            try {
-                const decoded = decodeToken(accessToken);
-                if (!decoded || !decoded.userId) {
-                    throw new Error('Invalid token');
-                }
-
-                // Jika token hampir kadaluarsa (kurang dari 1 menit), refresh token
-                const now = Date.now() / 1000;
-                if (decoded.exp - now < 60) {
-                    const refreshed = await refreshToken();
-                    if (!refreshed) {
-                        throw new Error('Failed to refresh token');
-                    }
-                }
-                return true;
-            } catch (error) {
-                console.error('Token verification failed:', error);
-                window.location.href = './login.html';
-                return false;
-            }
-        }
-
-        // Fungsi untuk membuat request dengan penanganan token
-        async function makeAuthorizedRequest(url, options = {}) {
-            let accessToken = sessionStorage.getItem('accessToken');
-            
-            // Tambahkan header Authorization jika belum ada
-            if (!options.headers) {
-                options.headers = {};
-            }
-            options.headers['Authorization'] = `Bearer ${accessToken}`;
-            
-            // Lakukan request
-            let response = await fetch(url, options);
-            
-            // Jika unauthorized, coba refresh token dan coba lagi
-            if (response.status === 401) {
-                const refreshed = await refreshToken();
-                if (refreshed) {
-                    accessToken = sessionStorage.getItem('accessToken');
-                    options.headers['Authorization'] = `Bearer ${accessToken}`;
-                    response = await fetch(url, options);
-                } else {
-                    sessionStorage.clear();
-                    window.location.href = './login.html';
-                    return null;
-                }
-            }
-            
-            return response;
-        }
-
-        // Panggil fungsi checkAuth saat halaman dimuat
-        document.addEventListener('DOMContentLoaded', async () => {
-            const isAuthenticated = await checkAuth();
-            if (!isAuthenticated) return;
-
-            // Ambil user data
-            const accessToken = sessionStorage.getItem('accessToken');
-            const userData = JSON.parse(sessionStorage.getItem('userData')) || {};
-            
-            // Jika tidak ada userData, ambil dari token
-            if (!userData.id && accessToken) {
-                const decoded = decodeToken(accessToken);
-                if (decoded) {
-                    const updatedUserData = {
-                        id: decoded.userId,
-                        username: decoded.username,
-                        fullName: decoded.fullName || 'User'
-                    };
-                    sessionStorage.setItem('userData', JSON.stringify(updatedUserData));
-                    document.getElementById('fullName').innerText = updatedUserData.fullName;
-                }
-            } else {
-                document.getElementById('fullName').innerText = userData.fullName || 'User';
-            }
-
-            // Fungsi logout
-            window.handleLogout = function() {
-                if (confirm("Are you sure you want to logout?")) {
-                    makeAuthorizedRequest(`${BASE_URL}/user/logout`, {
-                        method: 'POST',
-                        credentials: 'include'
-                    }).finally(() => {
-                        sessionStorage.clear();
-                        window.location.href = './login.html';
-                    });
-                }
-            };
-
-            // Account modal handler
-            document.getElementById('accountBtn').addEventListener('click', function() {
-                document.getElementById('editUsername').value = userData.username || '';
-                document.getElementById('editFullName').value = userData.fullName || '';
-                document.getElementById('editPassword').value = '';
-                new bootstrap.Modal(document.getElementById('accountModal')).show();
-            });
-
-            // Toggle password visibility
-            const passwordInput = document.getElementById('editPassword');
-            const togglePassword = document.getElementById('togglePassword');
-            togglePassword.addEventListener('click', () => {
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    togglePassword.textContent = 'Hide';
-                } else {
-                    passwordInput.type = 'password';
-                    togglePassword.textContent = 'Show';
-                }
-            });
-
-            // Handle form submission (Update user data)
-            document.getElementById('accountForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const updatedData = {
-                    username: document.getElementById('editUsername').value,
-                    fullName: document.getElementById('editFullName').value,
-                    password: document.getElementById('editPassword').value
-                };
-
-                try {
-                    const response = await makeAuthorizedRequest(`${BASE_URL}/user/edit`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(updatedData)
-                    });
-
-                    if (!response) return;
-
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        alert('Account updated successfully!');
-                        // Update user data in sessionStorage
-                        if (data.data) {
-                            sessionStorage.setItem('userData', JSON.stringify(data.data));
-                            document.getElementById('fullName').innerText = data.data.fullName;
-                        }
-                        bootstrap.Modal.getInstance(document.getElementById('accountModal')).hide();
-                    } else {
-                        alert('Error updating account: ' + (data.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                }
-            });
-
-            // Fungsi untuk menghapus akun
-            window.deleteAccount = function() {
-                if (confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
-                    makeAuthorizedRequest(`${BASE_URL}/user/delete/${userData.id}`, {
-                        method: 'DELETE'
-                    })
-                    .then(response => response ? response.json() : null)
-                    .then(data => {
-                        if (data && data.status === 'success') {
-                            alert('Account deleted successfully.');
-                            sessionStorage.clear();
-                            window.location.href = './login.html';
-                        } else {
-                            alert('Failed to delete account: ' + (data?.message || 'Unknown error'));
-                        }
-                    })
-                    .catch(error => console.error('Error deleting account:', error));
-                }
-            };
-
-            document.getElementById('deleteAccountBtn').addEventListener('click', deleteAccount);
-
-            // Fungsi untuk mengambil dan menampilkan catatan
-            window.fetchNotes = async function() {
-                try {
-                    const response = await makeAuthorizedRequest(`${BASE_URL}/note/all`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (!response) return;
-
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        displayNotes(data.data);
-                    } else {
-                        console.error('Failed to fetch notes:', data.message);
-                    }
-                } catch (error) {
-                    console.error('Error fetching notes:', error);
-                }
-            };
-
-            // Fungsi untuk menampilkan catatan (optimized)
-            window.displayNotes = function(notes) {
-                const container = document.getElementById('notes-container');
-                container.innerHTML = '';
-
-                notes.forEach(note => {
-                    const noteCard = document.createElement('div');
-                    noteCard.className = 'col';
-                    noteCard.innerHTML = `
-                        <div class="card shadow-sm rounded-lg note-card">
-                            <div class="card-header fw-bold">${note.noteTitle}</div>
-                            <div class="card-body">
-                                <p class="card-text text-muted note-content">${note.noteContent.replace(/\n/g, '<br>')}</p>
-                                <div class="d-flex justify-content-center button-container">
-                                    <button class="btn btn-danger" onclick="deleteNote(${note.id})">DELETE</button>
-                                    <button class="btn btn-primary" onclick="openEditModal(${note.id}, '${note.noteTitle.replace(/'/g, "\\'")}', '${note.noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    container.appendChild(noteCard);
-                });
-            };
-
-            // Fungsi untuk membuka modal tambah catatan
-            window.openCreateModal = function() {
-                document.getElementById('modalTitle').innerText = 'New Note';
-                document.getElementById('noteId').value = '';
-                document.getElementById('noteTitle').value = '';
-                document.getElementById('noteContent').value = '';
-                new bootstrap.Modal(document.getElementById('noteModal')).show();
-            };
-
-            // Fungsi untuk membuka modal edit catatan
-            window.openEditModal = function(id, title, content) {
-                document.getElementById('modalTitle').innerText = 'Edit Note';
-                document.getElementById('noteId').value = id;
-                document.getElementById('noteTitle').value = title;
-                document.getElementById('noteContent').value = content.replace(/\\n/g, '\n');
-                new bootstrap.Modal(document.getElementById('noteModal')).show();
-            };
-
-            // Fungsi untuk menyimpan catatan
-            window.saveNote = async function() {
-                const noteId = document.getElementById('noteId').value;
-                const noteTitle = document.getElementById('noteTitle').value;
-                const noteContent = document.getElementById('noteContent').value;
-                const method = noteId ? 'PUT' : 'POST';
-                const url = noteId ? `${BASE_URL}/note/edit/${noteId}` : `${BASE_URL}/note/new`;
-
-                try {
-                    const response = await makeAuthorizedRequest(url, {
-                        method: method,
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ noteTitle, noteContent })
-                    });
-
-                    if (!response) return;
-
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        fetchNotes();
-                        bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide();
-                    } else {
-                        alert('Failed to save note: ' + data.message);
-                    }
-                } catch (error) {
-                    console.error('Error saving note:', error);
-                    alert('An error occurred while saving the note.');
-                }
-            };
-
-            // Fungsi untuk menghapus catatan
-            window.deleteNote = function(noteId) {
-                if (!confirm('Are you sure you want to delete this note?')) return;
-                
-                makeAuthorizedRequest(`${BASE_URL}/note/delete/${noteId}`, {
-                    method: 'DELETE'
-                })
-                .then(response => response ? response.json() : null)
-                .then(data => {
-                    if (data && data.status === 'success') {
-                        fetchNotes();
-                    } else {
-                        alert('Failed to delete note.');
-                    }
-                })
-                .catch(error => console.error('Error deleting note:', error));
-            };
-
-            // Jalankan fetchNotes setelah semua setup selesai
-            fetchNotes();
+  // Fungsi logout yang diperbarui
+  async function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+      try {
+        await makeAuthenticatedRequest(`${BASE_URL}/user/logout`, {
+          method: 'POST'
         });
-    </script>
+      } finally {
+        localStorage.clear();
+        window.location.href = './login.html';
+      }
+    }
+  }
+
+  // Fungsi untuk mengambil dan menampilkan catatan dengan auth
+  async function fetchNotes() {
+    try {
+      const response = await makeAuthenticatedRequest(`${BASE_URL}/note/all`);
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        displayNotes(data.data);
+      } else {
+        console.error('Failed to fetch notes:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching notes:', error);
+    }
+  }
+
+  // Fungsi untuk menampilkan catatan (optimized)
+  function displayNotes(notes) {
+    const container = document.getElementById('notes-container');
+    container.innerHTML = '';
+
+    notes.forEach((note) => {
+      const noteCard = document.createElement('div');
+      noteCard.className = 'col';
+      noteCard.innerHTML = `
+        <div class="card shadow-sm rounded-lg note-card">
+          <div class="card-header fw-bold">${note.noteTitle}</div>
+          <div class="card-body">
+            <p class="card-text text-muted note-content">${note.noteContent.replace(/\n/g, '<br>')}</p>
+            <div class="d-flex justify-content-center button-container">
+              <button class="btn btn-danger" onclick="deleteNote(${note.id})">DELETE</button>
+              <button class="btn btn-primary" onclick="openEditModal(${note.id}, '${note.noteTitle.replace(/'/g, "\\'")}', '${note.noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(noteCard);
+    });
+  }
+
+  // Fungsi untuk menyimpan catatan dengan auth
+  async function saveNote() {
+    const noteId = document.getElementById('noteId').value;
+    const noteTitle = document.getElementById('noteTitle').value;
+    const noteContent = document.getElementById('noteContent').value;
+
+    try {
+      const url = noteId 
+        ? `${BASE_URL}/note/${noteId}` 
+        : `${BASE_URL}/note/new`;
+      
+      const method = noteId ? 'PUT' : 'POST';
+
+      const response = await makeAuthenticatedRequest(url, {
+        method,
+        body: JSON.stringify({ noteTitle, noteContent })
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        fetchNotes();
+        bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide();
+      } else {
+        alert('Failed to save note: ' + (data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error saving note:', error);
+      alert('An error occurred while saving the note.');
+    }
+  }
+
+  // Fungsi untuk menghapus catatan dengan auth
+  async function deleteNote(noteId) {
+    if (!confirm('Are you sure you want to delete this note?')) return;
+
+    try {
+      const response = await makeAuthenticatedRequest(`${BASE_URL}/note/${noteId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        fetchNotes();
+      } else {
+        alert('Failed to delete note.');
+      }
+    } catch (error) {
+      console.error('Error deleting note:', error);
+    }
+  }
+
+  // Event listeners
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchNotes();
+    
+    document.getElementById('accountBtn').addEventListener('click', function() {
+      document.getElementById('editUsername').value = userData.username || '';
+      document.getElementById('editFullName').value = userData.fullName || '';
+      document.getElementById('editPassword').value = '';
+      new bootstrap.Modal(document.getElementById('accountModal')).show();
+    });
+
+    // Toggle password visibility
+    const passwordInput = document.getElementById('editPassword');
+    const togglePassword = document.getElementById('togglePassword');
+    if (togglePassword) {
+      togglePassword.addEventListener('click', () => {
+        if (passwordInput.type === 'password') {
+          passwordInput.type = 'text';
+          togglePassword.textContent = 'Hide';
+        } else {
+          passwordInput.type = 'password';
+          togglePassword.textContent = 'Show';
+        }
+      });
+    }
+  });
+</script>
 </body>
 </html>
