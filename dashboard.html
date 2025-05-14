@@ -142,37 +142,37 @@
             }
 
             // Function to make authenticated requests
-async function makeAuthenticatedRequest(url, options = {}) {
-    let token = localStorage.getItem('accessToken');
+            async function makeAuthenticatedRequest(url, options = {}) {
+                let token = localStorage.getItem('accessToken');
 
-    const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers
-    };
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    ...options.headers
+                };
 
-    try {
-        let response = await fetch(url, { ...options, headers });
+                try {
+                    let response = await fetch(url, { ...options, headers });
 
-        if (response.status === 401) {
-            const newToken = await refreshAccessToken();
-            if (newToken) {
-                headers['Authorization'] = `Bearer ${newToken}`;
-                response = await fetch(url, { ...options, headers });
-            } else {
-                // Token gagal diperbarui
-                localStorage.clear();
-                window.location.href = './login.html';
-                return;
+                    if (response.status === 401) {
+                        const newToken = await refreshAccessToken();
+                        if (newToken) {
+                            headers['Authorization'] = `Bearer ${newToken}`;
+                            response = await fetch(url, { ...options, headers });
+                        } else {
+                            // Token gagal diperbarui
+                            localStorage.clear();
+                            window.location.href = './login.html';
+                            return;
+                        }
+                    }
+
+                    return response;
+                } catch (error) {
+                    console.error('Request failed:', error);
+                    throw error;
+                }
             }
-        }
-
-        return response;
-    } catch (error) {
-        console.error('Request failed:', error);
-        throw error;
-    }
-}
 
 
             // Logout function
@@ -203,8 +203,13 @@ async function makeAuthenticatedRequest(url, options = {}) {
 
                     const data = await response.json();
 
-                    if (data.status === 'success') {
+                    // Check if data structure is as expected
+                    if (data.status === 'success' && Array.isArray(data.data)) {
                         displayNotes(data.data);
+                    } else if (data.status === 'success' && !Array.isArray(data.data)) {
+                        // Handle case where data is not an array
+                        console.error('Expected array but got:', data.data);
+                        displayNotes([]); // Show empty state
                     } else {
                         console.error('Failed to fetch notes:', data.message);
                         alert('Failed to fetch notes: ' + (data.message || 'Unknown error'));
@@ -220,19 +225,34 @@ async function makeAuthenticatedRequest(url, options = {}) {
                 }
             }
 
-            // Function to display notes (optimized)
+            // Function to display notes
             function displayNotes(notes) {
                 const container = document.getElementById('notes-container');
                 if (!container) return;
 
                 container.innerHTML = '';
 
+                // Check if notes is an array and not empty
+                if (!Array.isArray(notes)) {
+                    console.error('Notes data is not an array:', notes);
+                    container.innerHTML = '<p class="text-center">No notes found or invalid data format</p>';
+                    return;
+                }
+
                 notes.forEach((note) => {
+                    // Skip if note is null or undefined
+                    if (!note) return;
+
                     const noteCard = document.createElement('div');
                     noteCard.className = 'col';
 
+                    // Ensure note properties exist before processing
+                    const noteContent = note.noteContent || '';
+                    const noteTitle = note.noteTitle || 'Untitled Note';
+
                     // Escape HTML in note content to prevent XSS
-                    const escapedContent = note.noteContent
+                    const escapedContent = noteContent
+                        .toString() // Ensure it's a string
                         .replace(/&/g, "&amp;")
                         .replace(/</g, "&lt;")
                         .replace(/>/g, "&gt;")
@@ -240,7 +260,8 @@ async function makeAuthenticatedRequest(url, options = {}) {
                         .replace(/'/g, "&#039;")
                         .replace(/\n/g, '<br>');
 
-                    const escapedTitle = note.noteTitle
+                    const escapedTitle = noteTitle
+                        .toString() // Ensure it's a string
                         .replace(/&/g, "&amp;")
                         .replace(/</g, "&lt;")
                         .replace(/>/g, "&gt;")
@@ -248,17 +269,17 @@ async function makeAuthenticatedRequest(url, options = {}) {
                         .replace(/'/g, "&#039;");
 
                     noteCard.innerHTML = `
-                    <div class="card shadow-sm rounded-lg note-card">
-                        <div class="card-header fw-bold">${escapedTitle}</div>
-                        <div class="card-body">
-                            <p class="card-text text-muted note-content">${escapedContent}</p>
-                            <div class="d-flex justify-content-center button-container">
-                                <button class="btn btn-danger" onclick="deleteNote('${note.id}')">DELETE</button>
-                                <button class="btn btn-primary" onclick="openEditModal('${note.id}', '${escapedTitle.replace(/'/g, "\\'")}', '${note.noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
-                            </div>
-                        </div>
+            <div class="card shadow-sm rounded-lg note-card">
+                <div class="card-header fw-bold">${escapedTitle}</div>
+                <div class="card-body">
+                    <p class="card-text text-muted note-content">${escapedContent}</p>
+                    <div class="d-flex justify-content-center button-container">
+                        <button class="btn btn-danger" onclick="deleteNote('${note.id || ''}')">DELETE</button>
+                        <button class="btn btn-primary" onclick="openEditModal('${note.id || ''}', '${escapedTitle.replace(/'/g, "\\'")}', '${noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
                     </div>
-                `;
+                </div>
+            </div>
+        `;
                     container.appendChild(noteCard);
                 });
             }
