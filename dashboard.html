@@ -49,20 +49,6 @@
     <script src="./js/utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Fungsi untuk menampilkan notifikasi
-        function showNotification(message, isError = false, elementId = 'notificationArea') {
-            const notificationArea = document.getElementById(elementId);
-            if (!notificationArea) return;
-
-            notificationArea.style.display = 'block';
-            notificationArea.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
-            notificationArea.textContent = message;
-
-            setTimeout(() => {
-                notificationArea.style.display = 'none';
-            }, 3000);
-        }
-
         // Fungsi untuk decode token JWT
         function decodeToken(token) {
             try {
@@ -78,268 +64,339 @@
             }
         }
 
-        // Fungsi untuk memeriksa token dan redirect jika tidak valid
-        function checkAuth() {
+        // Fungsi untuk memeriksa dan memperbarui token
+        async function checkAndRefreshToken() {
             const accessToken = localStorage.getItem('accessToken');
+            const refreshToken = getCookie('refreshToken');
+
             if (!accessToken) {
-                window.location.href = './login.html';
-                return false;
+                if (refreshToken) {
+                    try {
+                        // Coba refresh token
+                        const response = await fetch(`${BASE_URL}/user/refresh`, {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            localStorage.setItem('accessToken', data.accessToken);
+                            return data.accessToken;
+                        } else {
+                            throw new Error('Failed to refresh token');
+                        }
+                    } catch (error) {
+                        console.error('Token refresh failed:', error);
+                        redirectToLogin();
+                    }
+                } else {
+                    redirectToLogin();
+                }
             }
-            return true;
+
+            return accessToken;
         }
 
-        // Fungsi untuk membuat header authorization
-        function getAuthHeaders() {
-            const accessToken = localStorage.getItem('accessToken');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            };
+        // Fungsi untuk mendapatkan cookie
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
         }
 
-        // dashboard.js
-        document.addEventListener('DOMContentLoaded', () => {
-            // Cek autentikasi
-            if (!checkAuth()) return;
+        // Fungsi untuk redirect ke halaman login
+        function redirectToLogin() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('userData');
+            window.location.href = './login.html';
+        }
 
-            // Ambil data user
+        // Cek authentication saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', async () => {
+            const accessToken = await checkAndRefreshToken();
+            if (!accessToken) {
+                redirectToLogin();
+                return;
+            }
+
+            // Verifikasi token
+            const decodedToken = decodeToken(accessToken);
+            if (!decodedToken) {
+                redirectToLogin();
+                return;
+            }
+
+            // Ambil user data dari localStorage
             const userData = JSON.parse(localStorage.getItem('userData')) || {};
             document.getElementById('fullName').innerText = userData.fullName || 'User';
 
-            // Inisialisasi modal
-            const noteModal = new bootstrap.Modal(document.getElementById('noteModal'));
-            const accountModal = new bootstrap.Modal(document.getElementById('accountModal'));
-
-            // Fungsi logout
-            function handleLogout() {
-                if (confirm("Are you sure you want to logout?")) {
-                    fetch(`${BASE_URL}/user/logout`, {
-                        method: 'POST',
-                        credentials: 'include'
-                    }).finally(() => {
-                        localStorage.clear();
-                        window.location.href = './login.html';
-                    });
-                }
-            }
-
-            // Event listener untuk tombol logout
-            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-
-            // Event listener untuk tombol account
-            document.getElementById('accountBtn').addEventListener('click', function () {
-                document.getElementById('editUsername').value = userData.username || '';
-                document.getElementById('editFullName').value = userData.fullName || '';
-                document.getElementById('editPassword').value = '';
-                accountModal.show();
-            });
-
-            // Toggle password visibility
-            const passwordInput = document.getElementById('editPassword');
-            const togglePassword = document.getElementById('togglePassword');
-            if (togglePassword) {
-                togglePassword.addEventListener('click', () => {
-                    if (passwordInput.type === 'password') {
-                        passwordInput.type = 'text';
-                        togglePassword.textContent = 'Hide';
-                    } else {
-                        passwordInput.type = 'password';
-                        togglePassword.textContent = 'Show';
-                    }
-                });
-            }
-
-            // Handle form submission (Update user data)
-            document.getElementById('accountForm').addEventListener('submit', function (e) {
-                e.preventDefault();
-
-                const updatedData = {
-                    username: document.getElementById('editUsername').value,
-                    fullName: document.getElementById('editFullName').value,
-                    password: document.getElementById('editPassword').value
-                };
-
-                fetch(`${BASE_URL}/user/edit`, {
-                    method: 'PUT',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(updatedData)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            showNotification('Account updated successfully!', false);
-                            // Update user data in localStorage
-                            if (data.data) {
-                                localStorage.setItem('userData', JSON.stringify(data.data));
-                                document.getElementById('fullName').innerText = data.data.fullName;
-                            }
-                            accountModal.hide();
-                        } else {
-                            showNotification(data.message || 'Error updating account', true);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        showNotification('An error occurred while updating account', true);
-                    });
-            });
-
-            // Fungsi untuk menghapus akun
-            document.getElementById('deleteAccountBtn').addEventListener('click', function () {
-                if (confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
-                    fetch(`${BASE_URL}/user/delete/${userData.id}`, {
-                        method: 'DELETE',
-                        headers: getAuthHeaders()
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'success') {
-                                localStorage.clear();
-                                window.location.href = './login.html';
-                            } else {
-                                showNotification(data.message || 'Failed to delete account', true);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error deleting account:', error);
-                            showNotification('An error occurred while deleting account', true);
-                        });
-                }
-            });
-
-            // Fungsi untuk mengambil dan menampilkan catatan
-            function fetchNotes() {
-                fetch(`${BASE_URL}/notes/all`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Failed to fetch notes');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.status === 'success') {
-                            displayNotes(data.data);
-                        } else {
-                            showNotification(data.message || 'Failed to fetch notes', true);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching notes:', error);
-                        showNotification('Failed to fetch notes', true);
-                    });
-            }
-
-            // Fungsi untuk menampilkan catatan
-            function displayNotes(notes) {
-                const container = document.getElementById('notes-container');
-                container.innerHTML = '';
-
-                if (!notes || notes.length === 0) {
-                    container.innerHTML = '<p class="text-center">No notes found. Create your first note!</p>';
-                    return;
-                }
-
-                notes.forEach(note => {
-                    const noteCard = document.createElement('div');
-                    noteCard.className = 'col';
-                    noteCard.innerHTML = `
-                <div class="card shadow-sm rounded-lg note-card">
-                    <div class="card-header fw-bold">${note.noteTitle}</div>
-                    <div class="card-body">
-                        <p class="card-text text-muted note-content">${note.noteContent.replace(/\n/g, '<br>')}</p>
-                        <div class="d-flex justify-content-center button-container">
-                            <button class="btn btn-danger" onclick="deleteNote(${note.id})">DELETE</button>
-                            <button class="btn btn-primary" onclick="openEditModal(${note.id}, '${note.noteTitle.replace(/'/g, "\\'")}', '${note.noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">EDIT</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-                    container.appendChild(noteCard);
-                });
-            }
-
-            // Fungsi untuk membuka modal tambah catatan
-            window.openCreateModal = function () {
-                document.getElementById('modalTitle').innerText = 'New Note';
-                document.getElementById('noteId').value = '';
-                document.getElementById('noteTitle').value = '';
-                document.getElementById('noteContent').value = '';
-                noteModal.show();
-            };
-
-            // Fungsi untuk membuka modal edit catatan
-            window.openEditModal = function (id, title, content) {
-                document.getElementById('modalTitle').innerText = 'Edit Note';
-                document.getElementById('noteId').value = id;
-                document.getElementById('noteTitle').value = title;
-                document.getElementById('noteContent').value = content.replace(/\\n/g, '\n');
-                noteModal.show();
-            };
-
-            // Fungsi untuk menyimpan catatan
-            window.saveNote = function () {
-                const noteId = document.getElementById('noteId').value;
-                const noteTitle = document.getElementById('noteTitle').value;
-                const noteContent = document.getElementById('noteContent').value;
-
-                if (!noteTitle) {
-                    showNotification('Note title is required', true, 'noteNotification');
-                    return;
-                }
-
-                const method = noteId ? 'PUT' : 'POST';
-                const url = noteId ? `${BASE_URL}/notes/${noteId}` : `${BASE_URL}/notes/new`;
-
-                fetch(url, {
-                    method: method,
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({ noteTitle, noteContent })
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            fetchNotes();
-                            noteModal.hide();
-                            showNotification('Note saved successfully!', false);
-                        } else {
-                            showNotification(data.message || 'Failed to save note', true, 'noteNotification');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error saving note:', error);
-                        showNotification('An error occurred while saving the note', true, 'noteNotification');
-                    });
-            };
-
-            // Fungsi untuk menghapus catatan
-            window.deleteNote = function (noteId) {
-                if (!confirm('Are you sure you want to delete this note?')) return;
-
-                fetch(`${BASE_URL}/notes/delete/${noteId}`, {
-                    method: 'DELETE',
-                    headers: getAuthHeaders()
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            fetchNotes();
-                            showNotification('Note deleted successfully!', false);
-                        } else {
-                            showNotification(data.message || 'Failed to delete note', true);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error deleting note:', error);
-                        showNotification('An error occurred while deleting the note', true);
-                    });
-            };
-
-            // Jalankan fetchNotes saat halaman dimuat
+            // Load catatan
             fetchNotes();
         });
+
+        // Fungsi logout
+        async function handleLogout() {
+            if (confirm("Are you sure you want to logout?")) {
+                try {
+                    await fetch(`${BASE_URL}/user/logout`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                } finally {
+                    localStorage.clear();
+                    window.location.href = './login.html';
+                }
+            }
+        }
+
+        // Account modal handler
+        document.getElementById('accountBtn').addEventListener('click', function () {
+            const userData = JSON.parse(localStorage.getItem('userData')) || {};
+            document.getElementById('editUsername').value = userData.username || '';
+            document.getElementById('editFullName').value = userData.fullName || '';
+            document.getElementById('editPassword').value = '';
+            new bootstrap.Modal(document.getElementById('accountModal')).show();
+        });
+
+        // Toggle password visibility
+        const passwordInput = document.getElementById('editPassword');
+        const togglePassword = document.getElementById('togglePassword');
+        togglePassword.addEventListener('click', () => {
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                togglePassword.textContent = 'Hide';
+            } else {
+                passwordInput.type = 'password';
+                togglePassword.textContent = 'Show';
+            }
+        });
+
+        // Handle form submission (Update user data)
+        document.getElementById('accountForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const accessToken = await checkAndRefreshToken();
+            if (!accessToken) {
+                redirectToLogin();
+                return;
+            }
+
+            const updatedData = {
+                username: document.getElementById('editUsername').value,
+                fullName: document.getElementById('editFullName').value,
+                password: document.getElementById('editPassword').value
+            };
+
+            try {
+                const response = await fetch(`${BASE_URL}/user/edit`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify(updatedData)
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alert('Account updated successfully!');
+                    // Update user data in localStorage
+                    if (data.data) {
+                        localStorage.setItem('userData', JSON.stringify(data.data));
+                        document.getElementById('fullName').innerText = data.data.fullName;
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('accountModal')).hide();
+                } else {
+                    alert('Error updating account: ' + (data.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while updating your account.');
+            }
+        });
+
+        // Fungsi untuk menghapus akun
+        async function deleteAccount() {
+            if (confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+                const accessToken = await checkAndRefreshToken();
+                if (!accessToken) {
+                    redirectToLogin();
+                    return;
+                }
+
+                const userData = JSON.parse(localStorage.getItem('userData')) || {};
+
+                try {
+                    const response = await fetch(`${BASE_URL}/user/delete/${userData.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        alert('Account deleted successfully.');
+                        localStorage.clear();
+                        window.location.href = './login.html';
+                    } else {
+                        alert('Failed to delete account: ' + data.message);
+                    }
+                } catch (error) {
+                    console.error('Error deleting account:', error);
+                    alert('An error occurred while deleting your account.');
+                }
+            }
+        }
+
+        document.getElementById('deleteAccountBtn').addEventListener('click', deleteAccount);
+
+        // Fungsi untuk mengambil dan menampilkan catatan
+        async function fetchNotes() {
+            const accessToken = await checkAndRefreshToken();
+            if (!accessToken) {
+                redirectToLogin();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/note/all`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayNotes(data.data);
+                } else {
+                    console.error('Failed to fetch notes:', data.message);
+                    alert('Failed to load notes. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error fetching notes:', error);
+                alert('An error occurred while loading notes.');
+            }
+        }
+
+        // Fungsi untuk menampilkan catatan (optimized)
+        function displayNotes(notes) {
+            const container = document.getElementById('notes-container');
+            container.innerHTML = '';
+
+            notes.forEach(note => {
+                const noteCard = document.createElement('div');
+                noteCard.className = 'col';
+                noteCard.innerHTML = `
+          <div class="card shadow-sm rounded-lg note-card">
+            <div class="card-header fw-bold">${note.noteTitle}</div>
+            <div class="card-body">
+              <p class="card-text text-muted note-content">${note.noteContent.replace(/\n/g, '<br>')}</p>
+              <div class="d-flex justify-content-center button-container">
+                <button class="btn btn-danger" onclick="deleteNote(${note.id})">DELETE</button>
+                <button class="btn btn-primary" onclick="openEditModal(${note.id}, '${note.noteTitle.replace(/'/g, "\\'")}', '${note.noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
+              </div>
+            </div>
+          </div>
+        `;
+                container.appendChild(noteCard);
+            });
+        }
+
+        // Fungsi untuk membuka modal tambah catatan
+        function openCreateModal() {
+            document.getElementById('modalTitle').innerText = 'New Note';
+            document.getElementById('noteId').value = '';
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+            new bootstrap.Modal(document.getElementById('noteModal')).show();
+        }
+
+        // Fungsi untuk membuka modal edit catatan
+        function openEditModal(id, title, content) {
+            document.getElementById('modalTitle').innerText = 'Edit Note';
+            document.getElementById('noteId').value = id;
+            document.getElementById('noteTitle').value = title;
+            document.getElementById('noteContent').value = content.replace(/\\n/g, '\n');
+            new bootstrap.Modal(document.getElementById('noteModal')).show();
+        }
+
+        // Fungsi untuk menyimpan catatan
+        async function saveNote() {
+            const accessToken = await checkAndRefreshToken();
+            if (!accessToken) {
+                redirectToLogin();
+                return;
+            }
+
+            const noteId = document.getElementById('noteId').value;
+            const noteTitle = document.getElementById('noteTitle').value;
+            const noteContent = document.getElementById('noteContent').value;
+            const method = noteId ? 'PUT' : 'POST';
+            const url = noteId ? `${BASE_URL}/note/${noteId}` : `${BASE_URL}/note/new`;
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ noteTitle, noteContent })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    fetchNotes();
+                    bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide();
+                } else {
+                    alert('Failed to save note: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error saving note:', error);
+                alert('An error occurred while saving the note.');
+            }
+        }
+
+        // Fungsi untuk menghapus catatan
+        async function deleteNote(noteId) {
+            if (!confirm('Are you sure you want to delete this note?')) return;
+
+            const accessToken = await checkAndRefreshToken();
+            if (!accessToken) {
+                redirectToLogin();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/note/delete/${noteId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    fetchNotes();
+                } else {
+                    alert('Failed to delete note.');
+                }
+            } catch (error) {
+                console.error('Error deleting note:', error);
+                alert('An error occurred while deleting the note.');
+            }
+        }
     </script>
 </body>
 
