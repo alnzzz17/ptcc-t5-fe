@@ -6,37 +6,83 @@
     <title>Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="./css/style.css">
+    <style>
+        .note-card {
+            transition: transform 0.2s;
+        }
+        .note-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .note-content {
+            white-space: pre-line;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            -webkit-box-orient: vertical;
+        }
+    </style>
 </head>
-<body class="bg-gray-200">
+<body class="bg-light">
     <!-- Navbar -->
-    <nav class="navbar navbar-light bg-light shadow-sm px-4">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
         <span class="navbar-brand mb-0 h1 fw-bold">TWO-LIST</span>
         <div class="d-flex gap-3">
-            <button class="btn btn-light d-flex align-items-center gap-2" id="accountBtn">
-                Account
+            <button class="btn btn-outline-primary d-flex align-items-center gap-2" id="accountBtn">
+                <i class="bi bi-person"></i> Account
             </button>
-            <button class="btn btn-light text-danger d-flex align-items-center gap-2" id="logoutBtn">
-                Logout
+            <button class="btn btn-outline-danger d-flex align-items-center gap-2" id="logoutBtn">
+                <i class="bi bi-box-arrow-right"></i> Logout
             </button>
         </div>
     </nav>
 
     <!-- Welcome Section -->
-    <div class="text-center mt-4">
-        <h2 class="fw-bold">WELCOME, <span id="fullName">USER</span>!</h2>
-        <button class="btn btn-success my-3" id="newNoteBtn">NEW NOTE</button>
-    </div>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold">Welcome, <span id="fullName">User</span>!</h2>
+            <button class="btn btn-success" id="newNoteBtn">
+                <i class="bi bi-plus"></i> New Note
+            </button>
+        </div>
 
-    <!-- Notes Section -->
-    <div class="container">
+        <!-- Search and Filter -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search notes...">
+                    <button class="btn btn-outline-secondary" id="searchBtn">Search</button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <select class="form-select" id="sortSelect">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="title-asc">Title (A-Z)</option>
+                    <option value="title-desc">Title (Z-A)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Notes Section -->
         <div class="row row-cols-1 row-cols-md-3 g-4" id="notes-container">
             <!-- Notes will be displayed here -->
+            <div class="col-12 text-center py-5" id="loadingIndicator">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading your notes...</p>
+            </div>
+            <div class="col-12 text-center py-5" id="noNotesMessage" style="display: none;">
+                <p>No notes found. Create your first note!</p>
+            </div>
         </div>
     </div>
 
     <!-- Note Modal -->
     <div class="modal fade" id="noteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalTitle">New Note</h5>
@@ -51,7 +97,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="noteContent" class="form-label">Content</label>
-                            <textarea class="form-control" id="noteContent" rows="5" required></textarea>
+                            <textarea class="form-control" id="noteContent" rows="10" required></textarea>
                         </div>
                     </form>
                 </div>
@@ -99,381 +145,417 @@
         </div>
     </div>
 
-    <script src="./js/utils.js"></script>
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Utils JS -->
+    <script src="./js/utils.js"></script>
+
     <script>
-// Global variables
-let accessToken = localStorage.getItem('accessToken');
-let userData = JSON.parse(localStorage.getItem('userData')) || {};
-const noteModal = new bootstrap.Modal(document.getElementById('noteModal'));
-const accountModal = new bootstrap.Modal(document.getElementById('accountModal'));
+        // Global variables
+        let accessToken = localStorage.getItem('accessToken');
+        let userData = JSON.parse(localStorage.getItem('userData')) || {};
+        let allNotes = [];
 
-// Initialize the dashboard
-document.addEventListener('DOMContentLoaded', () => {
-  // Check authentication
-  if (!accessToken) {
-    window.location.href = './login.html';
-    return;
-  }
+        // Initialize modals
+        const noteModal = new bootstrap.Modal(document.getElementById('noteModal'));
+        const accountModal = new bootstrap.Modal(document.getElementById('accountModal'));
 
-  // Display user info
-  document.getElementById('fullName').textContent = userData.fullName || 'User';
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check authentication
+            if (!accessToken) {
+                window.location.href = './login.html';
+                return;
+            }
 
-  // Event listeners
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-  document.getElementById('newNoteBtn').addEventListener('click', openCreateModal);
-  document.getElementById('accountBtn').addEventListener('click', openAccountModal);
-  document.getElementById('saveNoteBtn').addEventListener('click', saveNote);
-  document.getElementById('togglePassword').addEventListener('click', togglePasswordVisibility);
-  document.getElementById('accountForm').addEventListener('submit', updateAccount);
-  document.getElementById('deleteAccountBtn').addEventListener('click', deleteAccount);
+            // Display user info
+            document.getElementById('fullName').textContent = userData.fullName || 'User';
 
-  // Load notes
-  fetchNotes();
-});
+            // Event listeners
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+            document.getElementById('newNoteBtn').addEventListener('click', openCreateModal);
+            document.getElementById('accountBtn').addEventListener('click', openAccountModal);
+            document.getElementById('saveNoteBtn').addEventListener('click', saveNote);
+            document.getElementById('togglePassword').addEventListener('click', togglePasswordVisibility);
+            document.getElementById('accountForm').addEventListener('submit', updateAccount);
+            document.getElementById('deleteAccountBtn').addEventListener('click', deleteAccount);
+            document.getElementById('searchBtn').addEventListener('click', handleSearch);
+            document.getElementById('searchInput').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') handleSearch();
+            });
+            document.getElementById('sortSelect').addEventListener('change', handleSort);
 
-// Authentication functions
-async function checkAuth() {
-  if (!accessToken) {
-    window.location.href = './login.html';
-    return false;
-  }
-  return true;
-}
+            // Load notes
+            fetchNotes();
+        });
 
-async function handleLogout() {
-  if (!confirm("Are you sure you want to logout?")) return;
-  
-  try {
-    const response = await fetch(`${BASE_URL}/user/logout`, {
-      method: 'POST',
-      credentials: 'include'
-    });
+        // Authentication functions
+        function checkAuth() {
+            if (!accessToken) {
+                window.location.href = './login.html';
+                return false;
+            }
+            return true;
+        }
 
-    if (!response.ok) throw new Error('Logout failed');
-    
-    localStorage.clear();
-    window.location.href = './login.html';
-  } catch (error) {
-    console.error('Logout error:', error);
-    localStorage.clear();
-    window.location.href = './login.html';
-  }
-}
+        async function handleLogout() {
+            if (!confirm("Are you sure you want to logout?")) return;
+            
+            try {
+                const response = await fetch(`${BASE_URL}/user/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
 
-// Note functions
-async function fetchNotes() {
-  if (!await checkAuth()) return;
+                if (!response.ok) throw new Error('Logout failed');
+                
+                localStorage.clear();
+                window.location.href = './login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                localStorage.clear();
+                window.location.href = './login.html';
+            }
+        }
 
-  try {
-    const response = await fetch(`${BASE_URL}/notes/all`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
+        // Note functions
+        async function fetchNotes() {
+            if (!checkAuth()) return;
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${BASE_URL}/notes/all`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-    if (response.status === 401) {
-      // Try to refresh token
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        return fetchNotes(); // Retry with new token
-      }
-      return;
-    }
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = './login.html';
+                    return;
+                }
 
-    const data = await response.json();
-    
-    if (data?.status === 'success') {
-      displayNotes(data.data);
-    } else {
-      throw new Error(data?.message || 'Failed to fetch notes');
-    }
-  } catch (error) {
-    console.error('Error fetching notes:', error);
-    alert('Error loading notes. Please try again.');
-  }
-}
+                const data = await response.json();
+                
+                if (data && data.status === 'success') {
+                    allNotes = data.data;
+                    displayNotes(allNotes);
+                } else {
+                    throw new Error(data?.message || 'Failed to fetch notes');
+                }
+            } catch (error) {
+                console.error('Error fetching notes:', error);
+                alert('Error loading notes. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
 
-async function refreshAccessToken() {
-  try {
-    const response = await fetch(`${BASE_URL}/user/refresh`, {
-      method: 'POST',
-      credentials: 'include'
-    });
+        function displayNotes(notes) {
+            const container = document.getElementById('notes-container');
+            const noNotesMessage = document.getElementById('noNotesMessage');
+            
+            // Clear existing notes except loading and no notes messages
+            Array.from(container.children).forEach(child => {
+                if (!child.id) container.removeChild(child);
+            });
 
-    if (!response.ok) throw new Error('Token refresh failed');
-    
-    const data = await response.json();
-    
-    if (data.accessToken) {
-      accessToken = data.accessToken;
-      localStorage.setItem('accessToken', accessToken);
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    localStorage.removeItem('accessToken');
-    window.location.href = './login.html';
-    return false;
-  }
-}
+            if (!notes || notes.length === 0) {
+                noNotesMessage.style.display = 'block';
+                return;
+            }
+            
+            noNotesMessage.style.display = 'none';
 
-function displayNotes(notes) {
-  const container = document.getElementById('notes-container');
-  container.innerHTML = '';
+            notes.forEach(note => {
+                const noteCard = document.createElement('div');
+                noteCard.className = 'col';
+                noteCard.innerHTML = `
+                    <div class="card shadow-sm rounded-lg note-card h-100">
+                        <div class="card-header fw-bold">${escapeHtml(note.noteTitle)}</div>
+                        <div class="card-body d-flex flex-column">
+                            <p class="card-text text-muted note-content">
+                                ${escapeHtml(note.noteContent).replace(/\n/g, '<br>')}
+                            </p>
+                            <div class="d-flex justify-content-center gap-2 mt-3">
+                                <button class="btn btn-danger btn-sm" onclick="deleteNote('${note.id}')">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                                <button class="btn btn-primary btn-sm" 
+                                    onclick="openEditModal('${note.id}', '${escapeHtml(note.noteTitle)}', '${escapeHtml(note.noteContent)}')">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-footer text-muted small">
+                            ${new Date(note.createdAt).toLocaleString()}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(noteCard);
+            });
+        }
 
-  if (!notes || notes.length === 0) {
-    container.innerHTML = '<p class="text-center">No notes found. Create your first note!</p>';
-    return;
-  }
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+        }
 
-  notes.forEach(note => {
-    const noteCard = document.createElement('div');
-    noteCard.className = 'col';
-    noteCard.innerHTML = `
-      <div class="card shadow-sm rounded-lg note-card h-100">
-        <div class="card-header fw-bold">${escapeHtml(note.noteTitle)}</div>
-        <div class="card-body d-flex flex-column">
-          <p class="card-text text-muted note-content flex-grow-1">
-            ${escapeHtml(note.noteContent).replace(/\n/g, '<br>')}
-          </p>
-          <div class="d-flex justify-content-center gap-2 mt-3">
-            <button class="btn btn-danger btn-sm" onclick="deleteNote('${note.id}')">DELETE</button>
-            <button class="btn btn-primary btn-sm" 
-              onclick="openEditModal('${note.id}', '${escapeHtml(note.noteTitle)}', '${escapeHtml(note.noteContent)}')">
-              EDIT
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-    container.appendChild(noteCard);
-  });
-}
+        function openCreateModal() {
+            if (!checkAuth()) return;
+            
+            document.getElementById('modalTitle').textContent = 'New Note';
+            document.getElementById('noteId').value = '';
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+            noteModal.show();
+        }
 
-function openCreateModal() {
-  if (!checkAuth()) return;
-  
-  document.getElementById('modalTitle').textContent = 'New Note';
-  document.getElementById('noteId').value = '';
-  document.getElementById('noteTitle').value = '';
-  document.getElementById('noteContent').value = '';
-  noteModal.show();
-}
+        function openEditModal(id, title, content) {
+            if (!checkAuth()) return;
+            
+            document.getElementById('modalTitle').textContent = 'Edit Note';
+            document.getElementById('noteId').value = id;
+            document.getElementById('noteTitle').value = title;
+            document.getElementById('noteContent').value = content;
+            noteModal.show();
+        }
 
-function openEditModal(id, title, content) {
-  if (!checkAuth()) return;
-  
-  document.getElementById('modalTitle').textContent = 'Edit Note';
-  document.getElementById('noteId').value = id;
-  document.getElementById('noteTitle').value = title;
-  document.getElementById('noteContent').value = content;
-  noteModal.show();
-}
+        async function saveNote() {
+            if (!checkAuth()) return;
+            
+            const noteId = document.getElementById('noteId').value;
+            const noteTitle = document.getElementById('noteTitle').value;
+            const noteContent = document.getElementById('noteContent').value;
 
-async function saveNote() {
-  if (!await checkAuth()) return;
-  
-  const noteId = document.getElementById('noteId').value;
-  const noteTitle = document.getElementById('noteTitle').value;
-  const noteContent = document.getElementById('noteContent').value;
+            if (!noteTitle || !noteContent) {
+                alert('Title and content are required');
+                return;
+            }
 
-  if (!noteTitle || !noteContent) {
-    alert('Title and content are required');
-    return;
-  }
+            const method = noteId ? 'PUT' : 'POST';
+            const url = noteId ? `${BASE_URL}/notes/${noteId}` : `${BASE_URL}/notes/new`;
 
-  const method = noteId ? 'PUT' : 'POST';
-  const url = noteId ? `${BASE_URL}/notes/${noteId}` : `${BASE_URL}/notes/new`;
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ noteTitle, noteContent })
+                });
 
-  try {
-    const response = await fetch(url, {
-      method: method,
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ noteTitle, noteContent })
-    });
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = './login.html';
+                    return;
+                }
 
-    if (response.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        return saveNote(); // Retry with new token
-      }
-      return;
-    }
+                const data = await response.json();
+                
+                if (data && data.status === 'success') {
+                    fetchNotes();
+                    noteModal.hide();
+                } else {
+                    throw new Error(data?.message || 'Failed to save note');
+                }
+            } catch (error) {
+                console.error('Error saving note:', error);
+                alert('Error saving note. Please try again.');
+            }
+        }
 
-    const data = await response.json();
-    
-    if (data?.status === 'success') {
-      fetchNotes();
-      noteModal.hide();
-    } else {
-      throw new Error(data?.message || 'Failed to save note');
-    }
-  } catch (error) {
-    console.error('Error saving note:', error);
-    alert('Error saving note. Please try again.');
-  }
-}
+        async function deleteNote(noteId) {
+            if (!checkAuth()) return;
+            if (!confirm('Are you sure you want to delete this note?')) return;
 
-async function deleteNote(noteId) {
-  if (!await checkAuth()) return;
-  if (!confirm('Are you sure you want to delete this note?')) return;
+            try {
+                const response = await fetch(`${BASE_URL}/notes/delete/${noteId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
 
-  try {
-    const response = await fetch(`${BASE_URL}/notes/${noteId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = './login.html';
+                    return;
+                }
 
-    if (response.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        return deleteNote(noteId); // Retry with new token
-      }
-      return;
-    }
+                const data = await response.json();
+                
+                if (data && data.status === 'success') {
+                    fetchNotes();
+                } else {
+                    throw new Error(data?.message || 'Failed to delete note');
+                }
+            } catch (error) {
+                console.error('Error deleting note:', error);
+                alert('Error deleting note. Please try again.');
+            }
+        }
 
-    const data = await response.json();
-    
-    if (data?.status === 'success') {
-      fetchNotes();
-    } else {
-      throw new Error(data?.message || 'Failed to delete note');
-    }
-  } catch (error) {
-    console.error('Error deleting note:', error);
-    alert('Error deleting note. Please try again.');
-  }
-}
+        // Account functions
+        function openAccountModal() {
+            if (!checkAuth()) return;
+            
+            document.getElementById('editUsername').value = userData.username || '';
+            document.getElementById('editFullName').value = userData.fullName || '';
+            document.getElementById('editPassword').value = '';
+            accountModal.show();
+        }
 
-// Account functions
-function openAccountModal() {
-  if (!checkAuth()) return;
-  
-  document.getElementById('editUsername').value = userData.username || '';
-  document.getElementById('editFullName').value = userData.fullName || '';
-  document.getElementById('editPassword').value = '';
-  accountModal.show();
-}
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('editPassword');
+            const toggleBtn = document.getElementById('togglePassword');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.textContent = 'Hide';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = 'Show';
+            }
+        }
 
-function togglePasswordVisibility() {
-  const passwordInput = document.getElementById('editPassword');
-  const toggleBtn = document.getElementById('togglePassword');
-  
-  if (passwordInput.type === 'password') {
-    passwordInput.type = 'text';
-    toggleBtn.textContent = 'Hide';
-  } else {
-    passwordInput.type = 'password';
-    toggleBtn.textContent = 'Show';
-  }
-}
+        async function updateAccount(e) {
+            e.preventDefault();
+            if (!checkAuth()) return;
+            
+            const updatedData = {
+                username: document.getElementById('editUsername').value,
+                fullName: document.getElementById('editFullName').value,
+                password: document.getElementById('editPassword').value || undefined
+            };
 
-async function updateAccount(e) {
-  e.preventDefault();
-  if (!await checkAuth()) return;
+            try {
+                const response = await fetch(`${BASE_URL}/user/edit`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedData)
+                });
 
-  const updatedData = {
-    username: document.getElementById('editUsername').value,
-    fullName: document.getElementById('editFullName').value,
-    password: document.getElementById('editPassword').value || undefined
-  };
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = './login.html';
+                    return;
+                }
 
-  try {
-    const response = await fetch(`${BASE_URL}/user/edit`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(updatedData)
-    });
+                const data = await response.json();
+                
+                if (data && data.status === 'success') {
+                    // Update local user data
+                    if (data.data) {
+                        userData = data.data;
+                        localStorage.setItem('userData', JSON.stringify(userData));
+                        document.getElementById('fullName').textContent = userData.fullName;
+                    }
+                    accountModal.hide();
+                    alert('Account updated successfully!');
+                } else {
+                    throw new Error(data?.message || 'Failed to update account');
+                }
+            } catch (error) {
+                console.error('Error updating account:', error);
+                alert('Error updating account. Please try again.');
+            }
+        }
 
-    if (response.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        return updateAccount(e); // Retry with new token
-      }
-      return;
-    }
+        async function deleteAccount() {
+            if (!checkAuth()) return;
+            if (!confirm("Are you sure you want to delete your account? This cannot be undone!")) return;
 
-    const data = await response.json();
-    
-    if (data?.status === 'success') {
-      // Update local user data
-      if (data.data) {
-        userData = data.data;
-        localStorage.setItem('userData', JSON.stringify(userData));
-        document.getElementById('fullName').textContent = userData.fullName;
-      }
-      accountModal.hide();
-      alert('Account updated successfully!');
-    } else {
-      throw new Error(data?.message || 'Failed to update account');
-    }
-  } catch (error) {
-    console.error('Error updating account:', error);
-    alert('Error updating account. Please try again.');
-  }
-}
+            try {
+                const response = await fetch(`${BASE_URL}/user/delete/${userData.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
 
-async function deleteAccount() {
-  if (!await checkAuth()) return;
-  if (!confirm("Are you sure you want to delete your account? This cannot be undone!")) return;
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = './login.html';
+                    return;
+                }
 
-  try {
-    const response = await fetch(`${BASE_URL}/user/delete/${userData.id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
+                const data = await response.json();
+                
+                if (data && data.status === 'success') {
+                    localStorage.clear();
+                    window.location.href = './login.html';
+                } else {
+                    throw new Error(data?.message || 'Failed to delete account');
+                }
+            } catch (error) {
+                console.error('Error deleting account:', error);
+                alert('Error deleting account. Please try again.');
+            }
+        }
 
-    if (response.status === 401) {
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        return deleteAccount(); // Retry with new token
-      }
-      return;
-    }
+        // Search and Sort functions
+        function handleSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (!searchTerm) {
+                displayNotes(allNotes);
+                return;
+            }
+            
+            const filteredNotes = allNotes.filter(note => 
+                note.noteTitle.toLowerCase().includes(searchTerm) || 
+                note.noteContent.toLowerCase().includes(searchTerm)
+            );
+            
+            displayNotes(filteredNotes);
+        }
 
-    const data = await response.json();
-    
-    if (data?.status === 'success') {
-      localStorage.clear();
-      window.location.href = './login.html';
-    } else {
-      throw new Error(data?.message || 'Failed to delete account');
-    }
-  } catch (error) {
-    console.error('Error deleting account:', error);
-    alert('Error deleting account. Please try again.');
-  }
-}
+        function handleSort() {
+            const sortValue = document.getElementById('sortSelect').value;
+            let sortedNotes = [...allNotes];
+            
+            switch (sortValue) {
+                case 'newest':
+                    sortedNotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    break;
+                case 'oldest':
+                    sortedNotes.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                    break;
+                case 'title-asc':
+                    sortedNotes.sort((a, b) => a.noteTitle.localeCompare(b.noteTitle));
+                    break;
+                case 'title-desc':
+                    sortedNotes.sort((a, b) => b.noteTitle.localeCompare(a.noteTitle));
+                    break;
+            }
+            
+            displayNotes(sortedNotes);
+        }
 
-// Helper function to escape HTML for safe insertion
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+        // Helper function to escape HTML for safe insertion
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
-// Make functions available globally for inline event handlers
-window.deleteNote = deleteNote;
-window.openEditModal = openEditModal;
+        // Make functions available globally for inline event handlers
+        window.deleteNote = deleteNote;
+        window.openEditModal = openEditModal;
     </script>
 </body>
 </html>
