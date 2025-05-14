@@ -203,20 +203,23 @@
 
                     const data = await response.json();
 
-                    // Check if data structure is as expected
-                    if (data.status === 'success' && Array.isArray(data.data)) {
-                        displayNotes(data.data);
-                    } else if (data.status === 'success' && !Array.isArray(data.data)) {
-                        // Handle case where data is not an array
-                        console.error('Expected array but got:', data.data);
-                        displayNotes([]); // Show empty state
+                    if (data.status === 'success') {
+                        // Ensure data.data is an array
+                        if (Array.isArray(data.data)) {
+                            displayNotes(data.data);
+                        } else {
+                            console.error('Invalid notes data format:', data.data);
+                            displayNotes([]); // Show empty state
+                        }
                     } else {
                         console.error('Failed to fetch notes:', data.message);
                         alert('Failed to fetch notes: ' + (data.message || 'Unknown error'));
+                        displayNotes([]); // Show empty state
                     }
                 } catch (error) {
                     console.error('Error fetching notes:', error);
                     alert('Error fetching notes: ' + error.message);
+                    displayNotes([]); // Show empty state
 
                     // If unauthorized, redirect to login
                     if (error.message.includes('Unauthorized') || error.message.includes('Session expired')) {
@@ -224,41 +227,64 @@
                     }
                 }
             }
-
             // Function to display notes
-// Function to fetch and display notes
-async function fetchNotes() {
-    try {
-        const response = await makeAuthenticatedRequest(`${BASE_URL}/notes/all`);
+            function displayNotes(notes) {
+                const container = document.getElementById('notes-container');
+                if (!container) return;
 
-        // Check if response is OK
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+                container.innerHTML = '';
 
-        const data = await response.json();
+                // Check if notes is an array and not empty
+                if (!Array.isArray(notes) || notes.length === 0) {
+                    container.innerHTML = '<p class="text-center">No notes found</p>';
+                    return;
+                }
 
-        // Check if data structure is as expected
-        if (data.status === 'success' && Array.isArray(data.data)) {
-            displayNotes(data.data);
-        } else if (data.status === 'success' && !Array.isArray(data.data)) {
-            // Handle case where data is not an array
-            console.error('Expected array but got:', data.data);
-            displayNotes([]); // Show empty state
-        } else {
-            console.error('Failed to fetch notes:', data.message);
-            alert('Failed to fetch notes: ' + (data.message || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Error fetching notes:', error);
-        alert('Error fetching notes: ' + error.message);
+                notes.forEach((note) => {
+                    // Skip if note is invalid
+                    if (!note || typeof note !== 'object') return;
 
-        // If unauthorized, redirect to login
-        if (error.message.includes('Unauthorized') || error.message.includes('Session expired')) {
-            handleLogout();
-        }
-    }
-}
+                    const noteCard = document.createElement('div');
+                    noteCard.className = 'col';
+
+                    // Ensure note content exists before processing
+                    const noteContent = note.noteContent || '';
+                    const noteTitle = note.noteTitle || 'Untitled Note';
+
+                    // Escape HTML in note content to prevent XSS
+                    const escapedContent = String(noteContent)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#039;")
+                        .replace(/\n/g, '<br>');
+
+                    const escapedTitle = String(noteTitle)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#039;");
+
+                    // Ensure note.id exists
+                    const noteId = note.id || '';
+
+                    noteCard.innerHTML = `
+            <div class="card shadow-sm rounded-lg note-card">
+                <div class="card-header fw-bold">${escapedTitle}</div>
+                <div class="card-body">
+                    <p class="card-text text-muted note-content">${escapedContent}</p>
+                    <div class="d-flex justify-content-center button-container">
+                        <button class="btn btn-danger" onclick="deleteNote('${noteId}')">DELETE</button>
+                        <button class="btn btn-primary" onclick="openEditModal('${noteId}', '${escapedTitle.replace(/'/g, "\\'")}', '${noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
+                    </div>
+                </div>
+            </div>
+        `;
+                    container.appendChild(noteCard);
+                });
+            }
             // Function to open create note modal
             function openCreateModal() {
                 document.getElementById('modalTitle').innerText = 'New Note';
