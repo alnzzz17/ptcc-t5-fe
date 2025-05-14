@@ -132,8 +132,10 @@
                     const newToken = await refreshAccessToken();
                     if (newToken) {
                         headers['Authorization'] = `Bearer ${newToken}`;
+                        localStorage.setItem('accessToken', newToken);
                         response = await fetch(url, { ...options, headers });
-                    } else {
+                    }
+                    else {
                         throw new Error('Session expired. Please login again.');
                     }
                 }
