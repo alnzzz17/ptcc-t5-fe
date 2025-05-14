@@ -226,64 +226,39 @@
             }
 
             // Function to display notes
-            function displayNotes(notes) {
-                const container = document.getElementById('notes-container');
-                if (!container) return;
+// Function to fetch and display notes
+async function fetchNotes() {
+    try {
+        const response = await makeAuthenticatedRequest(`${BASE_URL}/notes/all`);
 
-                container.innerHTML = '';
+        // Check if response is OK
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-                // Check if notes is an array and not empty
-                if (!Array.isArray(notes)) {
-                    console.error('Notes data is not an array:', notes);
-                    container.innerHTML = '<p class="text-center">No notes found or invalid data format</p>';
-                    return;
-                }
+        const data = await response.json();
 
-                notes.forEach((note) => {
-                    // Skip if note is null or undefined
-                    if (!note) return;
+        // Check if data structure is as expected
+        if (data.status === 'success' && Array.isArray(data.data)) {
+            displayNotes(data.data);
+        } else if (data.status === 'success' && !Array.isArray(data.data)) {
+            // Handle case where data is not an array
+            console.error('Expected array but got:', data.data);
+            displayNotes([]); // Show empty state
+        } else {
+            console.error('Failed to fetch notes:', data.message);
+            alert('Failed to fetch notes: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error fetching notes:', error);
+        alert('Error fetching notes: ' + error.message);
 
-                    const noteCard = document.createElement('div');
-                    noteCard.className = 'col';
-
-                    // Ensure note properties exist before processing
-                    const noteContent = note.noteContent || '';
-                    const noteTitle = note.noteTitle || 'Untitled Note';
-
-                    // Escape HTML in note content to prevent XSS
-                    const escapedContent = noteContent
-                        .toString() // Ensure it's a string
-                        .replace(/&/g, "&amp;")
-                        .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;")
-                        .replace(/"/g, "&quot;")
-                        .replace(/'/g, "&#039;")
-                        .replace(/\n/g, '<br>');
-
-                    const escapedTitle = noteTitle
-                        .toString() // Ensure it's a string
-                        .replace(/&/g, "&amp;")
-                        .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;")
-                        .replace(/"/g, "&quot;")
-                        .replace(/'/g, "&#039;");
-
-                    noteCard.innerHTML = `
-            <div class="card shadow-sm rounded-lg note-card">
-                <div class="card-header fw-bold">${escapedTitle}</div>
-                <div class="card-body">
-                    <p class="card-text text-muted note-content">${escapedContent}</p>
-                    <div class="d-flex justify-content-center button-container">
-                        <button class="btn btn-danger" onclick="deleteNote('${note.id || ''}')">DELETE</button>
-                        <button class="btn btn-primary" onclick="openEditModal('${note.id || ''}', '${escapedTitle.replace(/'/g, "\\'")}', '${noteContent.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">OPEN</button>
-                    </div>
-                </div>
-            </div>
-        `;
-                    container.appendChild(noteCard);
-                });
-            }
-
+        // If unauthorized, redirect to login
+        if (error.message.includes('Unauthorized') || error.message.includes('Session expired')) {
+            handleLogout();
+        }
+    }
+}
             // Function to open create note modal
             function openCreateModal() {
                 document.getElementById('modalTitle').innerText = 'New Note';
